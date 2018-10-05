@@ -3,24 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2041
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestPlayersService", "TestPlayersService\TestPlayersService.vcxproj", "{49D96E2C-B0F2-42A3-980A-83C488BF02C9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "App", "App\App.vcxproj", "{B1272AAA-675A-490A-B9CF-386E3A33A12A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Debug|x64.ActiveCfg = Debug|x64
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Debug|x64.Build.0 = Debug|x64
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Debug|x86.ActiveCfg = Debug|Win32
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Debug|x86.Build.0 = Debug|Win32
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Release|x64.ActiveCfg = Release|x64
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Release|x64.Build.0 = Release|x64
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Release|x86.ActiveCfg = Release|Win32
-		{49D96E2C-B0F2-42A3-980A-83C488BF02C9}.Release|x86.Build.0 = Release|Win32
+		{B1272AAA-675A-490A-B9CF-386E3A33A12A}.Debug|x64.ActiveCfg = Debug|x64
+		{B1272AAA-675A-490A-B9CF-386E3A33A12A}.Debug|x64.Build.0 = Debug|x64
+		{B1272AAA-675A-490A-B9CF-386E3A33A12A}.Release|x64.ActiveCfg = Release|x64
+		{B1272AAA-675A-490A-B9CF-386E3A33A12A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
