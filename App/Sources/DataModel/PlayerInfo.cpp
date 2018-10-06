@@ -32,7 +32,7 @@ void ps::PlayerInfo::MarkDeleted(Timestamp time)
 
 	// 5. Create new item (or aqcuire iterator to correct one).
 	iter++;
-	iter = m_RatingHistory.emplace_hint(iter);
+	iter = m_RatingHistory.try_emplace(iter, time);
 
 	// 6. Actually mark player as deleted.
 	iter->second.m_Deleted = true;

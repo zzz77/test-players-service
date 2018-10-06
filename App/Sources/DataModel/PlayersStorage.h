@@ -14,6 +14,8 @@ namespace ps
 	class PlayersStorage
 	{
 	public:
+		~PlayersStorage();
+
 		bool RegisterPlayerResult(std::string playerName, int playerRating);
 		bool UnregisterPlayer(std::string_view playerName);
 		bool Rollback(int step);

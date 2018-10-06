@@ -2,6 +2,16 @@
 
 #include "PlayerInfo.h"
 
+ps::PlayersStorage::~PlayersStorage()
+{
+	for (const auto& iter : m_Players)
+	{
+		delete iter.second;
+	}
+
+	m_Players.clear();
+}
+
 bool ps::PlayersStorage::RegisterPlayerResult(std::string playerName, int playerRating)
 {
 	m_CurrentTime.Tick();
