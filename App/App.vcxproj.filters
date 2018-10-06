@@ -4,10 +4,33 @@
     <Filter Include="Sources">
       <UniqueIdentifier>{7869375b-8ce8-4763-9d77-0d6c90d67812}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sources\DataModel">
+      <UniqueIdentifier>{9b60fa83-0362-4a7d-873d-1cb388a2db21}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\App.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="Sources\DataModel\PlayersStorage.cpp">
+      <Filter>Sources\DataModel</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\DataModel\PlayerInfo.cpp">
+      <Filter>Sources\DataModel</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\DataModel\Timestamp.cpp">
+      <Filter>Sources\DataModel</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Sources\DataModel\PlayersStorage.h">
+      <Filter>Sources\DataModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\DataModel\PlayerInfo.h">
+      <Filter>Sources\DataModel</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\DataModel\Timestamp.h">
+      <Filter>Sources\DataModel</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
