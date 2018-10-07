@@ -95,14 +95,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Sources\App.cpp" />
+    <ClCompile Include="Sources\CoreLib\RBTree.cpp" />
     <ClCompile Include="Sources\DataModel\PlayerInfo.cpp" />
     <ClCompile Include="Sources\DataModel\PlayersStorage.cpp" />
     <ClCompile Include="Sources\DataModel\Timestamp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Sources\CoreLib\RBTree.h" />
     <ClInclude Include="Sources\DataModel\PlayerInfo.h" />
     <ClInclude Include="Sources\DataModel\PlayersStorage.h" />
     <ClInclude Include="Sources\DataModel\Timestamp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Sources\CoreLib\RBTree.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

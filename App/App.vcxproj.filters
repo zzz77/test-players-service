@@ -7,6 +7,9 @@
     <Filter Include="Sources\DataModel">
       <UniqueIdentifier>{9b60fa83-0362-4a7d-873d-1cb388a2db21}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sources\CoreLib">
+      <UniqueIdentifier>{79e7946d-af36-41c7-8818-dd74be7666d3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\App.cpp">
@@ -21,6 +24,9 @@
     <ClCompile Include="Sources\DataModel\Timestamp.cpp">
       <Filter>Sources\DataModel</Filter>
     </ClCompile>
+    <ClCompile Include="Sources\CoreLib\RBTree.cpp">
+      <Filter>Sources\CoreLib</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Sources\DataModel\PlayersStorage.h">
@@ -32,5 +38,13 @@
     <ClInclude Include="Sources\DataModel\Timestamp.h">
       <Filter>Sources\DataModel</Filter>
     </ClInclude>
+    <ClInclude Include="Sources\CoreLib\RBTree.h">
+      <Filter>Sources\CoreLib</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Sources\CoreLib\RBTree.inl">
+      <Filter>Sources\CoreLib</Filter>
+    </None>
   </ItemGroup>
 </Project>
