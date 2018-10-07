@@ -64,6 +64,8 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 		// Create new node
 		keyNewParent->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>();
 		keyNewParent->m_Left->m_Key = key;
+		keyNewParent->m_Left->m_Red = true;
+		InsertFixup(keyNewParent->m_Left.get());
 		return keyNewParent->m_Left.get();
 	}
 
@@ -77,6 +79,8 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	// Create new node
 	keyNewParent->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>();
 	keyNewParent->m_Right->m_Key = key;
+	keyNewParent->m_Right->m_Red = true;
+	InsertFixup(keyNewParent->m_Right.get());
 	return keyNewParent->m_Right.get();
 }
 
@@ -241,6 +245,201 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::ClonePath(const TKey&
 	auto[newRoot, newKeyParent] = ClonePath(oldRoot, toKey);
 	m_RootHistory[m_CurrentVersion] = newRoot;
 	return newKeyParent;
+}
+
+template<typename TKey, typename TValue>
+inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newNode)
+{
+	// All parents has been cloned already. Uncles might not be cloned.
+	std::vector<ps::RBNode<TKey, TValue>*> parents = BuildPath(newNode);
+	auto getParent = [&parents]() { return parents[parents.size() - 1]; };
+	auto getGrandParent = [&parents]() { return parents[parents.size() - 2]; };
+	while (getParent()->m_Red)
+	{
+		if (getParent() == getGrandParent()->m_Left.get())
+		{
+			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Right.get();
+			if (uncle->m_Red)
+			{
+				// Case 1
+				getParent()->m_Red = false;
+				getGrandParent()->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*uncle);
+				uncle = getGrandParent()->m_Right.get();
+				uncle->m_Red = false;
+				getGrandParent()->m_Red = true;
+				newNode = getGrandParent();
+				parents.pop_back();
+				parents.pop_back();
+			}
+			else
+			{
+				if (newNode == getParent()->m_Right.get())
+				{
+					// Case 2
+					newNode = getParent();
+					parents.pop_back();
+
+					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
+					newNode->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Right);
+					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Right.get();
+					LeftRotate(newNode, getParent());
+					parents.push_back(willBeNewParent);
+				}
+
+				// Case 3. No else intended
+				getParent()->m_Red = false;
+				getGrandParent()->m_Red = true;
+
+				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
+				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Left);
+				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
+				RightRotate(getGrandParent(), parents[parents.size() - 3]);
+				parents.push_back(willBeNewParent);
+
+				// Rotation should always terminate loop
+				assert(!getParent()->m_Red);
+			}
+		}
+		else
+		{
+			/////////////////////////////////////////
+			// TODO: AVOID DUPLICATING THIS LOGIC !!!
+			/////////////////////////////////////////
+
+			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Left.get();
+			if (uncle->m_Red)
+			{
+				// Case 1
+				getParent()->m_Red = false;
+				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*uncle);
+				uncle = getGrandParent()->m_Left.get();
+				uncle->m_Red = false;
+				getGrandParent()->m_Red = true;
+				newNode = getGrandParent();
+				parents.pop_back();
+				parents.pop_back();
+			}
+			else
+			{
+				if (newNode == getParent()->m_Left.get())
+				{
+					// Case 2
+					newNode = getParent();
+					parents.pop_back();
+
+					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
+					newNode->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Right);
+					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Right.get();
+					LeftRotate(newNode, getParent());
+					parents.push_back(willBeNewParent);
+				}
+
+				// Case 3. No else intended
+				getParent()->m_Red = false;
+				getGrandParent()->m_Red = true;
+
+				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
+				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Left);
+				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
+				RightRotate(getGrandParent(), parents[parents.size() - 3]);
+				parents.push_back(willBeNewParent);
+
+				// Rotation should always terminate loop
+				assert(!getParent()->m_Red);
+			}
+		}
+	}
+
+	GetRoot()->m_Red = false;
+}
+
+template<typename TKey, typename TValue>
+inline std::vector<ps::RBNode<TKey, TValue>*> ps::RBTree<TKey, TValue>::BuildPath(ps::RBNode<TKey, TValue>* toNode)
+{
+	assert(toNode);
+	std::vector<ps::RBNode<TKey, TValue>*> path;
+	ps::RBNode<TKey, TValue>* node = GetRoot();
+	while (node && node->m_Key != toNode->m_Key)
+	{
+		path.push_back(node);
+		if (toNode->m_Key < node->m_Key)
+		{
+			node = node->m_Left.get();
+		}
+		else
+		{
+			node = node->m_Right.get();
+		}
+	}
+
+	if (!node)
+	{
+		return std::vector<ps::RBNode<TKey, TValue>*>();
+	}
+
+	return path;
+}
+
+template<typename TKey, typename TValue>
+inline void ps::RBTree<TKey, TValue>::RightRotate(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+{
+	// Important to keep shared_ptrs there. This way object won't be removed during swapping pointers
+	std::shared_ptr<ps::RBNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
+	std::shared_ptr<ps::RBNode<TKey, TValue>> childNode = target->m_Left;
+	targetNode->m_Left = childNode->m_Right;
+	if (!targetParent)
+	{
+		m_RootHistory[m_CurrentVersion] = childNode;
+	}
+	else if (targetParent->m_Left.get() == target)
+	{
+		targetParent->m_Left = childNode;
+	}
+	else
+	{
+		targetParent->m_Right = childNode;
+	}
+
+	childNode->m_Right = targetNode;
+}
+
+template<typename TKey, typename TValue>
+inline void ps::RBTree<TKey, TValue>::LeftRotate(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+{
+	// Important to keep shared_ptr there. This way object won't be removed during swapping pointers
+	std::shared_ptr<ps::RBNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
+	std::shared_ptr<ps::RBNode<TKey, TValue>> childNode = target->m_Right;
+	targetNode->m_Right = childNode->m_Left;
+	if (!targetParent)
+	{
+		m_RootHistory[m_CurrentVersion] = childNode;
+	}
+	else if (targetParent->m_Left.get() == target)
+	{
+		targetParent->m_Left = childNode;
+	}
+	else
+	{
+		targetParent->m_Right = childNode;
+	}
+
+	childNode->m_Left = targetNode;
+}
+
+template<typename TKey, typename TValue>
+inline std::shared_ptr<ps::RBNode<TKey, TValue>> ps::RBTree<TKey, TValue>::GetSharedPtr(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+{
+	if (!targetParent)
+	{
+		return m_RootHistory[m_CurrentVersion];
+	}
+	
+	if (targetParent->m_Left.get() == target)
+	{
+		return targetParent->m_Left;
+	}
+	
+	return targetParent->m_Right;
 }
 
 template<typename TKey, typename TValue>

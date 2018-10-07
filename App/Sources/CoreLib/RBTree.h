@@ -14,21 +14,12 @@ namespace ps
 
 		// TODO: Make TKey const
 		TKey m_Key;
+		bool m_Red;
 		TValue m_Value;
 
 		std::shared_ptr<RBNode<TKey, TValue>> m_Left;
 		std::shared_ptr<RBNode<TKey, TValue>> m_Right;
-
-		// TODO: Add version number in order to be able to understand in which version this node has been created
 	};
-
-	// Helper and temporary struct for tree traversal
-	//template <typename TKey, typename TValue>
-	//struct RBNodeWithParent
-	//{
-	//	RBNode<TKey, TValue>* m_Node;
-	//	RBNodeWithParent<TKey, TValue>* m_Parent;
-	//};
 
 	template <typename TKey, typename TValue>
 	class RBTree
@@ -73,13 +64,33 @@ namespace ps
 
 		/// Clones previous version of [from; toKey)-nodes.
 		/// Node with m_Key == toKey is not cloned if it exists.
-		/// Returns current version of from and toKey's parent.
+		/// Returns current version of from and toKey's parent node.
 		std::tuple<std::shared_ptr<Node>, Node*> ClonePath(Node* from, const TKey& toKey);
 
 		/// Detaches target from targetParent and makes source child of targetParent. 
 		/// TargetParent should be of current version.
 		/// Source can be either of old version or of current version. It is responsibility of caller to clone it if necessary
 		void Transplant(Node* target, Node* targetParent, std::shared_ptr<Node> source);
+
+		// TODO: Unite Left and Right rotate functions
+		/// Rotates subtree to left
+		/// Target and one of it's child will NOT be cloned. It is responsibility of caller to clone it if necessary
+		/// TargetParent should be of current version.
+		void LeftRotate(Node* target, Node* targetParent);
+
+		/// Rotates subtree to right
+		/// Target and one of it's child will NOT be cloned. It is responsibility of caller to clone it if necessary
+		/// TargetParent should be of current version.
+		void RightRotate(Node* target, Node* targetParent);
+
+		/// Finds target node in parent and returns shared_ptr which is stored in parent
+		std::shared_ptr<ps::RBNode<TKey, TValue>> GetSharedPtr(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent);
+
+		/// Restores RB-tree properties after inserting node.
+		void InsertFixup(Node* newNode);
+
+		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
+		std::vector<Node*> BuildPath(Node* toNode);
 
 		// TODO: Move to separate class with tests
 		bool DEBUG_CheckIfSorted(Node* node);
