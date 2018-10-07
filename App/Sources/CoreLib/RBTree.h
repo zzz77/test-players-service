@@ -47,31 +47,47 @@ namespace ps
 
 		// TODO: Should return ref to value probably
 		Node* Insert(const TKey& key);
-		Node* Delete(const TKey& key);
+		void Delete(const TKey& key);
 
 		// TODO: Should return consts (and be const)!
 		Node* Search(const TKey& key);
-		Node* Min();
-		Node* Max();
+
+		// TODO: Remove or add tests for unused functions
+		Node* GetMin();
+		Node* GetMax();
 
 		bool DEBUG_CheckIfSorted();
 
 	private:
 		Node* Search(Node* node, const TKey& key);
-		Node* Min(Node* node);
-		Node* Max(Node* node);
+		Node* GetMin(Node* node);
+		Node* GetMax(Node* node);
+
+		// TODO: Think of better API for traversal!
+		Node* GetMinParent(Node* node);
 
 		Node* GetRoot();
 		void ClearCurrentVersion();
-		/// Node with m_Key == key is not cloned if it exists. Parent node for key is returned (for current version and previous one). 
-		std::tuple<Node*, Node*> ClonePathTo(const TKey& key);
 
+		/// Clones previous version of [root; toKey)-nodes and insertes it into current version root.
+		/// Node with m_Key == toKey is not cloned if it exists.
+		/// Returns current version of toKey's parent node.
+		Node* ClonePath(const TKey& toKey);
+
+		/// Clones previous version of [from; toKey)-nodes.
+		/// Node with m_Key == toKey is not cloned if it exists.
+		/// Returns current version of from and toKey's parent.
+		std::tuple<std::shared_ptr<Node>, Node*> ClonePath(Node* from, const TKey& toKey);
+
+		/// Detaches target from targetParent and makes source child of targetParent. 
+		/// TargetParent should be of current version.
+		/// Source can be either of old version or of current version. It is responsibility of caller to clone it if necessary
+		void Transplant(Node* target, Node* targetParent, std::shared_ptr<Node> source);
+
+		// TODO: Move to separate class with tests
 		bool DEBUG_CheckIfSorted(Node* node);
-		
-		//void Transplant(RBNodeWithParent<TKey, TValue>* oldNode, RBNode<TKey, TValue>* newNode);
 
-		// TODO: make unique_ptr?
-		std::vector<Node*> m_RootHistory;
+		std::vector<std::shared_ptr<Node>> m_RootHistory;
 		int m_CurrentVersion;
 	};
 }
