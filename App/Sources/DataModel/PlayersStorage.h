@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Timestamp.h"
+#include "../CoreLib/RBTree.h"
 
 #include <functional>
 #include <map>
@@ -14,17 +14,13 @@ namespace ps
 	class PlayersStorage
 	{
 	public:
-		~PlayersStorage();
-
 		bool RegisterPlayerResult(std::string playerName, int playerRating);
-		bool UnregisterPlayer(std::string_view playerName);
+		bool UnregisterPlayer(const std::string& playerName);
 		bool Rollback(int step);
-		int GetPlayerRank(std::string_view playerName) const;
-		int GetPlayerRating(std::string_view playerName) const;
+		int GetPlayerRank(const std::string& playerName) const;
+		int GetPlayerRating(const std::string& playerName);
 
 	private:
-		std::map<std::string, PlayerInfo*, std::less<>> m_Players;
-
-		Timestamp m_CurrentTime;
+		RBTree<std::string, int> m_PlayerRatings;
 	};
 }

@@ -18,24 +18,12 @@
     <ClCompile Include="Sources\DataModel\PlayersStorage.cpp">
       <Filter>Sources\DataModel</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\DataModel\PlayerInfo.cpp">
-      <Filter>Sources\DataModel</Filter>
-    </ClCompile>
-    <ClCompile Include="Sources\DataModel\Timestamp.cpp">
-      <Filter>Sources\DataModel</Filter>
-    </ClCompile>
     <ClCompile Include="Sources\CoreLib\RBTree.cpp">
       <Filter>Sources\CoreLib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Sources\DataModel\PlayersStorage.h">
-      <Filter>Sources\DataModel</Filter>
-    </ClInclude>
-    <ClInclude Include="Sources\DataModel\PlayerInfo.h">
-      <Filter>Sources\DataModel</Filter>
-    </ClInclude>
-    <ClInclude Include="Sources\DataModel\Timestamp.h">
       <Filter>Sources\DataModel</Filter>
     </ClInclude>
     <ClInclude Include="Sources\CoreLib\RBTree.h">

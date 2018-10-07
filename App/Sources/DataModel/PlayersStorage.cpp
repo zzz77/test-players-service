@@ -1,55 +1,30 @@
 #include "PlayersStorage.h"
 
-#include "PlayerInfo.h"
-
-ps::PlayersStorage::~PlayersStorage()
-{
-	for (const auto& iter : m_Players)
-	{
-		delete iter.second;
-	}
-
-	m_Players.clear();
-}
-
 bool ps::PlayersStorage::RegisterPlayerResult(std::string playerName, int playerRating)
 {
-	m_CurrentTime.Tick();
-	PlayerInfo*& info = m_Players[std::move(playerName)];
-	if (info == nullptr)
-	{
-		info = new PlayerInfo();
-	}
-
-	info->RegisterRating(m_CurrentTime, playerRating);
+	m_PlayerRatings.Insert(playerName)->m_Value = playerRating;
 	return true;
 }
 
-bool ps::PlayersStorage::UnregisterPlayer(std::string_view playerName)
+bool ps::PlayersStorage::UnregisterPlayer(const std::string& playerName)
 {
-	auto iter = m_Players.find(playerName);
-	if (iter == m_Players.end())
-	{
-		return false;
-	}
-
-	m_CurrentTime.Tick();
-	iter->second->MarkDeleted(m_CurrentTime);
+	m_PlayerRatings.Delete(playerName);
 	return true;
 }
 
 bool ps::PlayersStorage::Rollback(int step)
 {
-	return m_CurrentTime.Rollback(step);
+	m_PlayerRatings.Rollback(step);
+	return true;
 }
 
-int ps::PlayersStorage::GetPlayerRating(std::string_view playerName) const
+int ps::PlayersStorage::GetPlayerRating(const std::string& playerName)
 {
-	auto iter = m_Players.find(playerName);
-	if (iter == m_Players.end())
+	auto* node = m_PlayerRatings.Search(playerName);
+	if (node)
 	{
-		return -1;
+		return node->m_Value;
 	}
 
-	return iter->second->GetRating(m_CurrentTime);
+	return -1;
 }

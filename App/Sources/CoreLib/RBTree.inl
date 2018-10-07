@@ -15,19 +15,16 @@ inline ps::RBTree<TKey, TValue>::RBTree()
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBTree<TKey, TValue>::~RBTree()
-{
-	//for (auto it = m_RootHistory.rbegin(); it != m_RootHistory.rend(); ++it)
-	//{
-	//	delete *it;
-	//}
-}
-
-template<typename TKey, typename TValue>
 inline void ps::RBTree<TKey, TValue>::Rollback(int delta)
 {
 	assert(delta > 0 && delta <= m_CurrentVersion);
 	m_CurrentVersion -= delta;
+}
+
+template<typename TKey, typename TValue>
+inline int ps::RBTree<TKey, TValue>::GetVersion() const
+{ 
+	return m_CurrentVersion; 
 }
 
 template<typename TKey, typename TValue>
@@ -221,7 +218,6 @@ inline void ps::RBTree<TKey, TValue>::ClearCurrentVersion()
 {
 	if (m_RootHistory.size() > m_CurrentVersion)
 	{
-		//delete m_RootHistory[m_CurrentVersion];
 		m_RootHistory[m_CurrentVersion] = nullptr;
 	}
 	else

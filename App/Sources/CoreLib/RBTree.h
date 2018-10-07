@@ -4,12 +4,9 @@
 #include <tuple>
 #include <vector>
 
-// PersistentRBTree!
+// PersistentMap!
 namespace ps
 {
-	//template<typename TKey, typename TValue>
-	//class RBTree;
-
 	template <typename TKey, typename TValue>
 	class RBNode
 	{
@@ -19,7 +16,6 @@ namespace ps
 		TKey m_Key;
 		TValue m_Value;
 
-		// TODO: Check assignments and use make_shared
 		std::shared_ptr<RBNode<TKey, TValue>> m_Left;
 		std::shared_ptr<RBNode<TKey, TValue>> m_Right;
 
@@ -41,11 +37,12 @@ namespace ps
 		using Node = ps::RBNode<TKey, TValue>;
 
 		RBTree();
-		~RBTree();
 
 		void Rollback(int delta);
+		int GetVersion() const;
 
 		// TODO: Should return ref to value probably
+		/// Creates new node with specified key. If node already created - returns pointer to it. Creates new version of data.
 		Node* Insert(const TKey& key);
 		void Delete(const TKey& key);
 
