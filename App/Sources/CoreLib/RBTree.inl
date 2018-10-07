@@ -131,6 +131,13 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Max()
 }
 
 template<typename TKey, typename TValue>
+inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted()
+{
+	Node* root = GetRoot();
+	return DEBUG_CheckIfSorted(root);
+}
+
+template<typename TKey, typename TValue>
 inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetRoot()
 {
 	Node* root = m_RootHistory.size() > m_CurrentVersion ? m_RootHistory[m_CurrentVersion] : nullptr;
@@ -209,6 +216,27 @@ inline std::tuple<ps::RBNode<TKey, TValue>*, ps::RBNode<TKey, TValue>*> ps::RBTr
 
 	// Should never reach this point
 	std::abort();
+}
+
+template<typename TKey, typename TValue>
+inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted(ps::RBNode<TKey, TValue>* node)
+{
+	if (!node)
+	{
+		return true;
+	}
+
+	if (node->m_Left && node->m_Left->m_Key > node->m_Key)
+	{
+		return false;
+	}
+
+	if (node->m_Right && node->m_Right->m_Key < node->m_Key)
+	{
+		return false;
+	}
+
+	return DEBUG_CheckIfSorted(node->m_Left.get()) && DEBUG_CheckIfSorted(node->m_Right.get());
 }
 
 template<typename TKey, typename TValue>

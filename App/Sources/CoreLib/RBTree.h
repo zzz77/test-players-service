@@ -38,30 +38,35 @@ namespace ps
 	class RBTree
 	{
 	public:
-		using Node = RBNode<TKey, TValue>;
+		using Node = ps::RBNode<TKey, TValue>;
 
 		RBTree();
 		~RBTree();
 
 		void Rollback(int delta);
 
+		// TODO: Should return ref to value probably
 		Node* Insert(const TKey& key);
 		Node* Delete(const TKey& key);
 
-		// TODO: Should return consts!
+		// TODO: Should return consts (and be const)!
 		Node* Search(const TKey& key);
 		Node* Min();
 		Node* Max();
 
+		bool DEBUG_CheckIfSorted();
+
 	private:
-		Node* GetRoot();
-		void ClearCurrentVersion();
 		Node* Search(Node* node, const TKey& key);
 		Node* Min(Node* node);
 		Node* Max(Node* node);
 
-		// Node with m_Key == key is not cloned if it exists. Parent node for key is returned (for current version and previous one). 
+		Node* GetRoot();
+		void ClearCurrentVersion();
+		/// Node with m_Key == key is not cloned if it exists. Parent node for key is returned (for current version and previous one). 
 		std::tuple<Node*, Node*> ClonePathTo(const TKey& key);
+
+		bool DEBUG_CheckIfSorted(Node* node);
 		
 		//void Transplant(RBNodeWithParent<TKey, TValue>* oldNode, RBNode<TKey, TValue>* newNode);
 
