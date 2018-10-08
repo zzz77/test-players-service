@@ -1,2 +1,2 @@
 # Test application
-Used for experimenting with data structures, algorithms and architecture for tracking and storing users graph
+Used for experimenting with persistent data structures and algorithms for tracking and storing players ratings
