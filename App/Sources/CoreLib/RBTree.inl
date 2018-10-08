@@ -39,8 +39,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	// Special case - create root
 	if (!m_RootHistory[m_CurrentVersion - 1])
 	{
-		m_RootHistory[m_CurrentVersion] = std::make_shared<ps::RBNode<TKey, TValue>>();
-		m_RootHistory[m_CurrentVersion]->m_Key = key;
+		m_RootHistory[m_CurrentVersion] = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
 		return m_RootHistory[m_CurrentVersion].get();
 	}
 
@@ -48,7 +47,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	if (!keyNewParent)
 	{
 		// If we didn't found path to that key that means that we're trying to modify root node. Clone it and return.
-		m_RootHistory[m_CurrentVersion] = std::make_shared<ps::RBNode<TKey, TValue>>(*m_RootHistory[m_CurrentVersion - 1]);
+		m_RootHistory[m_CurrentVersion] = m_RootHistory[m_CurrentVersion - 1]->Clone(m_CurrentVersion);
 		return m_RootHistory[m_CurrentVersion].get();
 	}
 
@@ -57,14 +56,13 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 		if (keyNewParent->m_Left)
 		{
 			// Target node has been found. Clone it and return
-			keyNewParent->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*keyNewParent->m_Left);
+			keyNewParent->m_Left = keyNewParent->m_Left->Clone(m_CurrentVersion);
 			return keyNewParent->m_Left.get();
 		}
 
 		// Create new node
-		keyNewParent->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>();
-		keyNewParent->m_Left->m_Key = key;
-		keyNewParent->m_Left->m_Red = true;
+		keyNewParent->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
+		keyNewParent->m_Left->SetColor(m_CurrentVersion, true);
 		InsertFixup(keyNewParent->m_Left.get());
 
 		// Fixup can invalidate node (by cloning it for instance)
@@ -74,14 +72,13 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	if (keyNewParent->m_Right)
 	{
 		// Target node has been found. Clone it and return
-		keyNewParent->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*keyNewParent->m_Right);
+		keyNewParent->m_Right = keyNewParent->m_Right->Clone(m_CurrentVersion);
 		return keyNewParent->m_Right.get();
 	}
 
 	// Create new node
-	keyNewParent->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>();
-	keyNewParent->m_Right->m_Key = key;
-	keyNewParent->m_Right->m_Red = true;
+	keyNewParent->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
+	keyNewParent->m_Right->SetColor(m_CurrentVersion, true);
 	InsertFixup(keyNewParent->m_Right.get());
 
 	// Fixup can invalidate node (by cloning it for instance)
@@ -114,17 +111,21 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 		nodeToDelete = nodeToDeleteNewParent->m_Right;
 	}
 
-	bool requiresFixup = !nodeToDelete->m_Red;
+	bool requiresFixup = !nodeToDelete->IsRed();
 
 	//		Start moving subtrees which effectively deletes node.
 	// 1. Case when node which will replace deletable node has 0 or 1 child
 	if (!nodeToDelete->m_Left)
 	{
-		ps::RBNode<TKey, TValue>* replacementNode = nodeToDelete->m_Right.get();
-		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, nodeToDelete->m_Right);
+		std::shared_ptr<ps::RBNode<TKey, TValue>> replacementNode = nodeToDelete->m_Right ? nodeToDelete->m_Right->Clone(m_CurrentVersion) : nullptr;
+		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, replacementNode);
 		if (requiresFixup)
 		{
-			DeleteFixup(replacementNode);
+			// Special case - if tree is empty now
+			if (GetRoot())
+			{
+				DeleteFixup(replacementNode.get(), nodeToDeleteNewParent);
+			}
 		}
 
 		return;
@@ -132,11 +133,11 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 
 	if (!nodeToDelete->m_Right)
 	{
-		ps::RBNode<TKey, TValue>* replacementNode = nodeToDelete->m_Left.get();
-		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, nodeToDelete->m_Left);
+		std::shared_ptr<ps::RBNode<TKey, TValue>> replacementNode = nodeToDelete->m_Left ? nodeToDelete->m_Left->Clone(m_CurrentVersion) : nullptr;
+		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, replacementNode);
 		if (requiresFixup)
 		{
-			DeleteFixup(replacementNode);
+			DeleteFixup(replacementNode.get(), nodeToDeleteNewParent);
 		}
 
 		return;
@@ -155,27 +156,35 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 		replacementNode = nodeToDelete->m_Right.get();
 	}
 
-	requiresFixup = !replacementNode->m_Red;
+	requiresFixup = !replacementNode->IsRed();
 	if (replacementNodeParent == nodeToDelete.get())
 	{
 		// 2a. Case when node which will replace deletable node is deletable node's direct child
-		std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = std::make_shared<ps::RBNode<TKey, TValue>>(*replacementNode);
+		std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
 		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
 		clonedReplacementNode->m_Left = nodeToDelete->m_Left;
+		clonedReplacementNode->SetColor(m_CurrentVersion, nodeToDelete->IsRed());
+		if (requiresFixup)
+		{
+			clonedReplacementNode->m_Right = clonedReplacementNode->m_Right ? clonedReplacementNode->m_Right->Clone(m_CurrentVersion) : nullptr;
+			DeleteFixup(clonedReplacementNode->m_Right.get(), clonedReplacementNode.get());
+		}
+
 		return;
 	}
 
 	// 2b. Case when node which will replace deletable node is NOT deletable node's direct child. That means that we need to clone path to this replacementNode
 	auto[nodeToDeleteNewRightChild, replacementNodeNewParent] = ClonePath(nodeToDelete->m_Right.get(), replacementNode->m_Key);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = std::make_shared<ps::RBNode<TKey, TValue>>(*replacementNode);
+	std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
 	Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
-	clonedReplacementNode->m_Red = nodeToDelete->m_Red;
+	clonedReplacementNode->SetColor(m_CurrentVersion, nodeToDelete->IsRed());
 	clonedReplacementNode->m_Left = nodeToDelete->m_Left;
 	clonedReplacementNode->m_Right = nodeToDeleteNewRightChild;
 	replacementNodeNewParent->m_Left = replacementNode->m_Right;
 	if (requiresFixup)
 	{
-		DeleteFixup(replacementNode->m_Right.get());
+		replacementNodeNewParent->m_Left = replacementNodeNewParent->m_Left ? replacementNodeNewParent->m_Left->Clone(m_CurrentVersion) : nullptr;
+		DeleteFixup(replacementNodeNewParent->m_Left.get(), replacementNodeNewParent);
 	}
 }
 
@@ -228,7 +237,7 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB()
 
 	ps::RBNode<TKey, TValue>* minNode = GetMin();
 	int blackNodes = DEBUG_CountBlackNodes(minNode);
-	return !root->m_Red && DEBUG_CheckIfRB(root, blackNodes);
+	return !root->IsRed() && DEBUG_CheckIfRB(root, blackNodes);
 }
 
 template<typename TKey, typename TValue>
@@ -286,56 +295,57 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::ClonePath(const TKey&
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newNode)
+inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixNode)
 {
-	// All parents has been cloned already. Uncles might not be cloned.
-	std::vector<ps::RBNode<TKey, TValue>*> parents = BuildPath(newNode);
+	// TODO: Consider caching parent and grandparent
+	// All parents has been cloned already. Uncles has not.
+	std::vector<ps::RBNode<TKey, TValue>*> parents = BuildPath(fixNode);
 	auto getParent = [&parents]() { return parents[parents.size() - 1]; };
 	auto getGrandParent = [&parents]() { return parents[parents.size() - 2]; };
-	while (getParent() && getParent()->m_Red)
+	while (getParent() && getParent()->IsRed())
 	{
 		if (getParent() == getGrandParent()->m_Left.get())
 		{
 			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Right.get();
-			if (uncle && uncle->m_Red)
+			if (uncle && uncle->IsRed())
 			{
 				// Case 1
-				getParent()->m_Red = false;
-				getGrandParent()->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*uncle);
+				getParent()->SetColor(m_CurrentVersion, false);
+				getGrandParent()->m_Right = uncle->Clone(m_CurrentVersion);
 				uncle = getGrandParent()->m_Right.get();
-				uncle->m_Red = false;
-				getGrandParent()->m_Red = true;
-				newNode = getGrandParent();
+				uncle->SetColor(m_CurrentVersion, false);
+				getGrandParent()->SetColor(m_CurrentVersion, true);
+				fixNode = getGrandParent();
 				parents.pop_back();
 				parents.pop_back();
 			}
 			else
 			{
-				if (newNode == getParent()->m_Right.get())
+				if (fixNode == getParent()->m_Right.get())
 				{
 					// Case 2
-					newNode = getParent();
+					fixNode = getParent();
 					parents.pop_back();
 
 					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-					newNode->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Right);
-					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Right.get();
-					LeftRotate(newNode, getParent());
+					fixNode->m_Right = fixNode->m_Right->Clone(m_CurrentVersion);
+					ps::RBNode<TKey, TValue>* willBeNewParent = fixNode->m_Right.get();
+					LeftRotate(fixNode, getParent());
 					parents.push_back(willBeNewParent);
 				}
 
 				// Case 3. No else intended
-				getParent()->m_Red = false;
-				getGrandParent()->m_Red = true;
+				getParent()->SetColor(m_CurrentVersion, false);
+				getGrandParent()->SetColor(m_CurrentVersion, true);
 
 				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Left);
+				getGrandParent()->m_Left = getGrandParent()->m_Left->Clone(m_CurrentVersion);
 				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
 				RightRotate(getGrandParent(), parents[parents.size() - 3]);
 				parents.push_back(willBeNewParent);
 
 				// Rotation should always terminate loop
-				assert(!getParent()->m_Red);
+				assert(!getParent()->IsRed());
 			}
 		}
 		else
@@ -345,50 +355,50 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newN
 			/////////////////////////////////////////
 
 			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Left.get();
-			if (uncle && uncle->m_Red)
+			if (uncle && uncle->IsRed())
 			{
 				// Case 1
-				getParent()->m_Red = false;
-				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*uncle);
+				getParent()->SetColor(m_CurrentVersion, false);
+				getGrandParent()->m_Left = uncle->Clone(m_CurrentVersion);
 				uncle = getGrandParent()->m_Left.get();
-				uncle->m_Red = false;
-				getGrandParent()->m_Red = true;
-				newNode = getGrandParent();
+				uncle->SetColor(m_CurrentVersion, false);
+				getGrandParent()->SetColor(m_CurrentVersion, true);
+				fixNode = getGrandParent();
 				parents.pop_back();
 				parents.pop_back();
 			}
 			else
 			{
-				if (newNode == getParent()->m_Left.get())
+				if (fixNode == getParent()->m_Left.get())
 				{
 					// Case 2
-					newNode = getParent();
+					fixNode = getParent();
 					parents.pop_back();
 
 					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-					newNode->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Left);
-					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Left.get();
-					RightRotate(newNode, getParent());
+					fixNode->m_Left = fixNode->m_Left->Clone(m_CurrentVersion);
+					ps::RBNode<TKey, TValue>* willBeNewParent = fixNode->m_Left.get();
+					RightRotate(fixNode, getParent());
 					parents.push_back(willBeNewParent);
 				}
 
 				// Case 3. No else intended
-				getParent()->m_Red = false;
-				getGrandParent()->m_Red = true;
+				getParent()->SetColor(m_CurrentVersion, false);
+				getGrandParent()->SetColor(m_CurrentVersion, true);
 
 				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-				getGrandParent()->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Right);
+				getGrandParent()->m_Right = getGrandParent()->m_Right->Clone(m_CurrentVersion);
 				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Right.get();
 				LeftRotate(getGrandParent(), parents[parents.size() - 3]);
 				parents.push_back(willBeNewParent);
 
 				// Rotation should always terminate loop
-				assert(!getParent()->m_Red);
+				assert(!getParent()->IsRed());
 			}
 		}
 	}
 
-	GetRoot()->m_Red = false;
+	GetRoot()->SetColor(m_CurrentVersion, false);
 }
 
 template<typename TKey, typename TValue>
@@ -490,13 +500,13 @@ inline int ps::RBTree<TKey, TValue>::DEBUG_CountBlackNodes(ps::RBNode<TKey, TVal
 	std::vector<ps::RBNode<TKey, TValue>*> path = BuildPath(toNode);
 	for (auto* node : path)
 	{
-		if (node && !node->m_Red)
+		if (node && !node->IsRed())
 		{
 			blackNodes++;
 		}
 	}
 
-	if (!toNode->m_Red)
+	if (!toNode->IsRed())
 	{
 		blackNodes++;
 	}
@@ -512,12 +522,12 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB(ps::RBNode<TKey, TValue>* 
 		return true;
 	}
 
-	if (node->m_Red && node->m_Left && node->m_Left->m_Red)
+	if (node->IsRed() && node->m_Left && node->m_Left->IsRed())
 	{
 		return false;
 	}
 
-	if (node->m_Red && node->m_Right && node->m_Right->m_Red)
+	if (node->IsRed() && node->m_Right && node->m_Right->IsRed())
 	{
 		return false;
 	}
@@ -535,8 +545,156 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB(ps::RBNode<TKey, TValue>* 
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* /*replacementNode*/)
+inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixNode, ps::RBNode<TKey, TValue>* parentForNullNode)
 {
+	// All parents has been cloned already. Sublings has not.
+	std::vector<ps::RBNode<TKey, TValue>*> parents = fixNode ? BuildPath(fixNode) : BuildPath(parentForNullNode);
+	if (!fixNode)
+	{
+		assert(parentForNullNode);
+		parents.push_back(parentForNullNode);
+	}
+
+	auto getParent = [&parents]() { return parents[parents.size() - 1]; };
+	auto getGrandParent = [&parents]() { return parents[parents.size() - 2]; };
+	while (fixNode != GetRoot() && (!fixNode || !fixNode->IsRed()))
+	{
+		if (fixNode == getParent()->m_Left.get())
+		{
+			ps::RBNode<TKey, TValue>* subling = getParent()->m_Right.get();
+			if (subling && subling->IsRed())
+			{
+				// Case 1
+				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
+				subling = getParent()->m_Right.get();
+				subling->SetColor(m_CurrentVersion, false);
+				getParent()->SetColor(m_CurrentVersion, true);
+				LeftRotate(getParent(), getGrandParent());
+				
+				// Restore parents
+				ps::RBNode<TKey, TValue>* parent = parents.back();
+				parents.pop_back();
+				parents.push_back(subling);
+				parents.push_back(parent);
+
+				// Find new subling
+				subling = getParent()->m_Right.get();
+			}
+
+			if ((!subling->m_Left || !subling->m_Left->IsRed()) && (!subling->m_Right || !subling->m_Right->IsRed()))
+			{
+				// Case 2. Both subling's children are black
+				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
+				subling = getParent()->m_Right.get();
+				subling->SetColor(m_CurrentVersion, true);
+				fixNode = getParent();
+				parents.pop_back();
+			}
+			else
+			{
+				if (!subling->m_Right || !subling->m_Right->IsRed())
+				{
+					// Case 3
+					// Cloning subling in order to clone its child and rotate them then
+					getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
+					subling = getParent()->m_Right.get();
+					subling->m_Left = subling->m_Left->Clone(m_CurrentVersion);
+					subling->m_Left->SetColor(m_CurrentVersion, false);
+					subling->SetColor(m_CurrentVersion, true);
+					RightRotate(subling, getParent());
+
+					// Find new subling
+					subling = getParent()->m_Right.get();
+				}
+
+				// Case 4. No else intended
+				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
+				subling = getParent()->m_Right.get();
+				subling->m_Right = subling->m_Right->Clone(m_CurrentVersion);
+				subling->SetColor(m_CurrentVersion, getParent()->IsRed());
+				getParent()->SetColor(m_CurrentVersion, false);
+				subling->m_Right->SetColor(m_CurrentVersion, false);
+				LeftRotate(getParent(), getGrandParent());
+
+				// Restore parents
+				ps::RBNode<TKey, TValue>* parent = parents.back();
+				parents.pop_back();
+				parents.push_back(subling);
+				parents.push_back(parent);
+
+				fixNode = GetRoot();
+			}
+		}
+		else
+		{
+			ps::RBNode<TKey, TValue>* subling = getParent()->m_Left.get();
+			if (subling && subling->IsRed())
+			{
+				// Case 1
+				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
+				subling = getParent()->m_Left.get();
+				subling->SetColor(m_CurrentVersion, false);
+				getParent()->SetColor(m_CurrentVersion, true);
+				RightRotate(getParent(), getGrandParent());
+
+				// Restore parents
+				ps::RBNode<TKey, TValue>* parent = parents.back();
+				parents.pop_back();
+				parents.push_back(subling);
+				parents.push_back(parent);
+
+				// Find new subling
+				subling = getParent()->m_Left.get();
+			}
+
+			if ((!subling->m_Left || !subling->m_Left->IsRed()) && (!subling->m_Right || !subling->m_Right->IsRed()))
+			{
+				// Case 2. Both subling's children are black
+				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
+				subling = getParent()->m_Left.get();
+				subling->SetColor(m_CurrentVersion, true);
+				fixNode = getParent();
+				parents.pop_back();
+			}
+			else
+			{
+				if (!subling->m_Left || !subling->m_Left->IsRed())
+				{
+					// Case 3
+					// Cloning subling in order to clone its child and rotate them then
+					getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
+					subling = getParent()->m_Left.get();
+					subling->m_Right = subling->m_Right->Clone(m_CurrentVersion);
+					subling->m_Right->SetColor(m_CurrentVersion, false);
+					subling->SetColor(m_CurrentVersion, true);
+					LeftRotate(subling, getParent());
+
+					// Find new subling
+					subling = getParent()->m_Left.get();
+				}
+
+				// Case 4. No else intended
+				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
+				subling = getParent()->m_Left.get();
+				subling->m_Left = subling->m_Left->Clone(m_CurrentVersion);
+				subling->SetColor(m_CurrentVersion, getParent()->IsRed());
+				getParent()->SetColor(m_CurrentVersion, false);
+				subling->m_Left->SetColor(m_CurrentVersion, false);
+				RightRotate(getParent(), getGrandParent());
+
+				// Restore parents
+				ps::RBNode<TKey, TValue>* parent = parents.back();
+				parents.pop_back();
+				parents.push_back(subling);
+				parents.push_back(parent);
+
+				fixNode = GetRoot();
+			}
+		}
+	}
+
+	// Always root node - so it should be cloned already
+	fixNode->SetColor(m_CurrentVersion, false);
 }
 
 template<typename TKey, typename TValue>
@@ -544,7 +702,7 @@ inline std::tuple<std::shared_ptr<ps::RBNode<TKey, TValue>>, ps::RBNode<TKey, TV
 	ps::RBNode<TKey, TValue>* from, const TKey& toKey)
 {
 	assert(from->m_Key != toKey);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> newFrom = std::make_shared<ps::RBNode<TKey, TValue>>(*from);
+	std::shared_ptr<ps::RBNode<TKey, TValue>> newFrom = from->Clone(m_CurrentVersion);
 	ps::RBNode<TKey, TValue>* newNode = newFrom.get();
 	while (true)
 	{
@@ -576,12 +734,12 @@ inline std::tuple<std::shared_ptr<ps::RBNode<TKey, TValue>>, ps::RBNode<TKey, TV
 		// Continue traversal
 		if (toKey < newNode->m_Key)
 		{
-			newNode->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Left);
+			newNode->m_Left = newNode->m_Left->Clone(m_CurrentVersion);
 			newNode = newNode->m_Left.get();
 		}
 		else
 		{
-			newNode->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Right);
+			newNode->m_Right = newNode->m_Right->Clone(m_CurrentVersion);
 			newNode = newNode->m_Right.get();
 		}
 	}

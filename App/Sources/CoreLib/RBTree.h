@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <memory>
 #include <tuple>
 #include <vector>
@@ -11,14 +12,44 @@ namespace ps
 	class RBNode
 	{
 	public:
+		RBNode(const TKey& key, int currentVersion)
+			: m_Key(key)
+			, m_CreateVersion(currentVersion)
+			, m_Red(false)
+			, m_Value(TValue())
+			, m_Left(nullptr)
+			, m_Right(nullptr)
+		{
+		}
 
-		// TODO: Make TKey const
+		std::shared_ptr<RBNode> Clone(int currentVersion)
+		{
+			std::shared_ptr<RBNode> cloned = std::make_shared<RBNode>(*this);
+			cloned->m_CreateVersion = currentVersion;
+			return cloned;
+		}
+
+		void SetColor(int currentVersion, bool red)
+		{
+			assert(m_CreateVersion == currentVersion);
+			m_Red = red;
+		}
+
+		bool IsRed() { return m_Red; }
+
+		// TODO: Make key and version consts
 		TKey m_Key;
-		bool m_Red;
+		int m_CreateVersion;
 		TValue m_Value;
+
+		// TODO: Add version number into node itself. It will give additional safety - to not change old nodes and to avoid excessive clones of new nodes
+		// TODO: Introduce cloneRight and cloneLeft
 
 		std::shared_ptr<RBNode<TKey, TValue>> m_Left;
 		std::shared_ptr<RBNode<TKey, TValue>> m_Right;
+
+	private:
+		bool m_Red;
 	};
 
 	template <typename TKey, typename TValue>
@@ -39,8 +70,6 @@ namespace ps
 
 		// TODO: Should return consts (and be const)!
 		Node* Search(const TKey& key);
-
-		// TODO: Remove or add tests for unused functions
 		Node* GetMin();
 		Node* GetMax();
 
@@ -88,10 +117,10 @@ namespace ps
 		std::shared_ptr<ps::RBNode<TKey, TValue>> GetSharedPtr(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent);
 
 		/// Restores RB-tree properties after inserting node.
-		void InsertFixup(Node* newNode);
+		void InsertFixup(Node* fixNode);
 
 		/// Restores RB-tree properties after deleting node.
-		void DeleteFixup(Node* replacementNode);
+		void DeleteFixup(Node* fixNode, Node* parentForNullNode);
 
 		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
 		std::vector<Node*> BuildPath(Node* toNode);
