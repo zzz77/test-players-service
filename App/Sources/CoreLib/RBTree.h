@@ -45,6 +45,7 @@ namespace ps
 		Node* GetMax();
 
 		bool DEBUG_CheckIfSorted();
+		bool DEBUG_CheckIfRB();
 
 	private:
 		Node* Search(Node* node, const TKey& key);
@@ -89,11 +90,16 @@ namespace ps
 		/// Restores RB-tree properties after inserting node.
 		void InsertFixup(Node* newNode);
 
+		/// Restores RB-tree properties after deleting node.
+		void DeleteFixup(Node* replacementNode);
+
 		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
 		std::vector<Node*> BuildPath(Node* toNode);
 
 		// TODO: Move to separate class with tests
 		bool DEBUG_CheckIfSorted(Node* node);
+		bool DEBUG_CheckIfRB(Node* node, int expectedBlackNodes);
+		int DEBUG_CountBlackNodes(Node* toNode);
 
 		std::vector<std::shared_ptr<Node>> m_RootHistory;
 		int m_CurrentVersion;

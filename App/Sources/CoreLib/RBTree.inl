@@ -66,7 +66,9 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 		keyNewParent->m_Left->m_Key = key;
 		keyNewParent->m_Left->m_Red = true;
 		InsertFixup(keyNewParent->m_Left.get());
-		return keyNewParent->m_Left.get();
+
+		// Fixup can invalidate node (by cloning it for instance)
+		return Search(key);
 	}
 
 	if (keyNewParent->m_Right)
@@ -81,7 +83,9 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	keyNewParent->m_Right->m_Key = key;
 	keyNewParent->m_Right->m_Red = true;
 	InsertFixup(keyNewParent->m_Right.get());
-	return keyNewParent->m_Right.get();
+
+	// Fixup can invalidate node (by cloning it for instance)
+	return Search(key);
 }
 
 template<typename TKey, typename TValue>
@@ -96,31 +100,45 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 
 	// Find parent of node being deleted and clone all path to this parent (including parent itself)
 	ps::RBNode<TKey, TValue>* nodeToDeleteNewParent = ClonePath(key);
-	ps::RBNode<TKey, TValue>* nodeToDelete = nullptr;
+	std::shared_ptr<ps::RBNode<TKey, TValue>> nodeToDelete = nullptr;
 	if (!nodeToDeleteNewParent)
 	{
-		nodeToDelete = m_RootHistory[m_CurrentVersion - 1].get();
+		nodeToDelete = m_RootHistory[m_CurrentVersion - 1];
 	}
 	else if (nodeToDeleteNewParent->m_Left && nodeToDeleteNewParent->m_Left->m_Key == key)
 	{
-		nodeToDelete = nodeToDeleteNewParent->m_Left.get();
+		nodeToDelete = nodeToDeleteNewParent->m_Left;
 	}
 	else
 	{
-		nodeToDelete = nodeToDeleteNewParent->m_Right.get();
+		nodeToDelete = nodeToDeleteNewParent->m_Right;
 	}
+
+	bool requiresFixup = !nodeToDelete->m_Red;
 
 	//		Start moving subtrees which effectively deletes node.
 	// 1. Case when node which will replace deletable node has 0 or 1 child
 	if (!nodeToDelete->m_Left)
 	{
-		Transplant(nodeToDelete, nodeToDeleteNewParent, nodeToDelete->m_Right);
+		ps::RBNode<TKey, TValue>* replacementNode = nodeToDelete->m_Right.get();
+		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, nodeToDelete->m_Right);
+		if (requiresFixup)
+		{
+			DeleteFixup(replacementNode);
+		}
+
 		return;
 	}
 
 	if (!nodeToDelete->m_Right)
 	{
-		Transplant(nodeToDelete, nodeToDeleteNewParent, nodeToDelete->m_Left);
+		ps::RBNode<TKey, TValue>* replacementNode = nodeToDelete->m_Left.get();
+		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, nodeToDelete->m_Left);
+		if (requiresFixup)
+		{
+			DeleteFixup(replacementNode);
+		}
+
 		return;
 	}
 
@@ -133,15 +151,16 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	}
 	else
 	{
-		replacementNodeParent = nodeToDelete;
+		replacementNodeParent = nodeToDelete.get();
 		replacementNode = nodeToDelete->m_Right.get();
 	}
 
-	if (replacementNodeParent == nodeToDelete)
+	requiresFixup = !replacementNode->m_Red;
+	if (replacementNodeParent == nodeToDelete.get())
 	{
 		// 2a. Case when node which will replace deletable node is deletable node's direct child
 		std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = std::make_shared<ps::RBNode<TKey, TValue>>(*replacementNode);
-		Transplant(nodeToDelete, nodeToDeleteNewParent, clonedReplacementNode);
+		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
 		clonedReplacementNode->m_Left = nodeToDelete->m_Left;
 		return;
 	}
@@ -149,10 +168,15 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	// 2b. Case when node which will replace deletable node is NOT deletable node's direct child. That means that we need to clone path to this replacementNode
 	auto[nodeToDeleteNewRightChild, replacementNodeNewParent] = ClonePath(nodeToDelete->m_Right.get(), replacementNode->m_Key);
 	std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = std::make_shared<ps::RBNode<TKey, TValue>>(*replacementNode);
-	Transplant(nodeToDelete, nodeToDeleteNewParent, clonedReplacementNode);
+	Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
+	clonedReplacementNode->m_Red = nodeToDelete->m_Red;
 	clonedReplacementNode->m_Left = nodeToDelete->m_Left;
 	clonedReplacementNode->m_Right = nodeToDeleteNewRightChild;
 	replacementNodeNewParent->m_Left = replacementNode->m_Right;
+	if (requiresFixup)
+	{
+		DeleteFixup(replacementNode->m_Right.get());
+	}
 }
 
 template<typename TKey, typename TValue>
@@ -171,7 +195,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin()
 		return nullptr;
 	}
 
-	return Min(root);
+	return GetMin(root);
 }
 
 template<typename TKey, typename TValue>
@@ -183,7 +207,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMax()
 		return nullptr;
 	}
 
-	return Max(root);
+	return GetMax(root);
 }
 
 template<typename TKey, typename TValue>
@@ -191,6 +215,20 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted()
 {
 	Node* root = GetRoot();
 	return DEBUG_CheckIfSorted(root);
+}
+
+template<typename TKey, typename TValue>
+inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB()
+{
+	Node* root = GetRoot();
+	if (!root)
+	{
+		return true;
+	}
+
+	ps::RBNode<TKey, TValue>* minNode = GetMin();
+	int blackNodes = DEBUG_CountBlackNodes(minNode);
+	return !root->m_Red && DEBUG_CheckIfRB(root, blackNodes);
 }
 
 template<typename TKey, typename TValue>
@@ -254,12 +292,12 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newN
 	std::vector<ps::RBNode<TKey, TValue>*> parents = BuildPath(newNode);
 	auto getParent = [&parents]() { return parents[parents.size() - 1]; };
 	auto getGrandParent = [&parents]() { return parents[parents.size() - 2]; };
-	while (getParent()->m_Red)
+	while (getParent() && getParent()->m_Red)
 	{
 		if (getParent() == getGrandParent()->m_Left.get())
 		{
 			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Right.get();
-			if (uncle->m_Red)
+			if (uncle && uncle->m_Red)
 			{
 				// Case 1
 				getParent()->m_Red = false;
@@ -307,7 +345,7 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newN
 			/////////////////////////////////////////
 
 			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Left.get();
-			if (uncle->m_Red)
+			if (uncle && uncle->m_Red)
 			{
 				// Case 1
 				getParent()->m_Red = false;
@@ -328,9 +366,9 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newN
 					parents.pop_back();
 
 					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-					newNode->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Right);
-					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Right.get();
-					LeftRotate(newNode, getParent());
+					newNode->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*newNode->m_Left);
+					ps::RBNode<TKey, TValue>* willBeNewParent = newNode->m_Left.get();
+					RightRotate(newNode, getParent());
 					parents.push_back(willBeNewParent);
 				}
 
@@ -339,9 +377,9 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* newN
 				getGrandParent()->m_Red = true;
 
 				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
-				getGrandParent()->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Left);
-				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
-				RightRotate(getGrandParent(), parents[parents.size() - 3]);
+				getGrandParent()->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(*getGrandParent()->m_Right);
+				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Right.get();
+				LeftRotate(getGrandParent(), parents[parents.size() - 3]);
 				parents.push_back(willBeNewParent);
 
 				// Rotation should always terminate loop
@@ -358,6 +396,9 @@ inline std::vector<ps::RBNode<TKey, TValue>*> ps::RBTree<TKey, TValue>::BuildPat
 {
 	assert(toNode);
 	std::vector<ps::RBNode<TKey, TValue>*> path;
+
+	// Parent of root is always nullptr
+	path.push_back(nullptr);
 	ps::RBNode<TKey, TValue>* node = GetRoot();
 	while (node && node->m_Key != toNode->m_Key)
 	{
@@ -440,6 +481,62 @@ inline std::shared_ptr<ps::RBNode<TKey, TValue>> ps::RBTree<TKey, TValue>::GetSh
 	}
 	
 	return targetParent->m_Right;
+}
+
+template<typename TKey, typename TValue>
+inline int ps::RBTree<TKey, TValue>::DEBUG_CountBlackNodes(ps::RBNode<TKey, TValue>* toNode)
+{
+	int blackNodes = 0;
+	std::vector<ps::RBNode<TKey, TValue>*> path = BuildPath(toNode);
+	for (auto* node : path)
+	{
+		if (node && !node->m_Red)
+		{
+			blackNodes++;
+		}
+	}
+
+	if (!toNode->m_Red)
+	{
+		blackNodes++;
+	}
+
+	return blackNodes;
+}
+
+template<typename TKey, typename TValue>
+inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB(ps::RBNode<TKey, TValue>* node, int expectedBlackNodes)
+{
+	if (!node)
+	{
+		return true;
+	}
+
+	if (node->m_Red && node->m_Left && node->m_Left->m_Red)
+	{
+		return false;
+	}
+
+	if (node->m_Red && node->m_Right && node->m_Right->m_Red)
+	{
+		return false;
+	}
+
+	if (!node->m_Left || !node->m_Right)
+	{
+		int blackNodes = DEBUG_CountBlackNodes(node);
+		if (blackNodes != expectedBlackNodes)
+		{
+			return false;
+		}
+	}
+
+	return DEBUG_CheckIfRB(node->m_Left.get(), expectedBlackNodes) && DEBUG_CheckIfRB(node->m_Right.get(), expectedBlackNodes);
+}
+
+template<typename TKey, typename TValue>
+inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* /*replacementNode*/)
+{
 }
 
 template<typename TKey, typename TValue>
@@ -557,7 +654,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin(ps::RBNode<TKe
 {
 	while (node->m_Left)
 	{
-		node = node->m_Left;
+		node = node->m_Left.get();
 	}
 
 	return node;
@@ -568,7 +665,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMax(ps::RBNode<TKe
 {
 	while (node->m_Right)
 	{
-		node = node->m_Right;
+		node = node->m_Right.get();
 	}
 
 	return node;
