@@ -8,27 +8,27 @@
 #include <memory>
 
 template<typename TKey, typename TValue>
-inline ps::RBTree<TKey, TValue>::RBTree()
+inline pst::PersistentMap<TKey, TValue>::PersistentMap()
 	: m_CurrentVersion(0)
 {
 	ClearCurrentVersion();
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::Rollback(int delta)
+inline void pst::PersistentMap<TKey, TValue>::Rollback(int delta)
 {
 	assert(delta > 0 && delta <= m_CurrentVersion);
 	m_CurrentVersion -= delta;
 }
 
 template<typename TKey, typename TValue>
-inline int ps::RBTree<TKey, TValue>::GetVersion() const
+inline int pst::PersistentMap<TKey, TValue>::GetVersion() const
 { 
 	return m_CurrentVersion; 
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& key)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Insert(const TKey& key)
 {
 	assert(m_CurrentVersion >= 0);
 	m_CurrentVersion++;
@@ -39,11 +39,11 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	// Special case - create root
 	if (!m_RootHistory[m_CurrentVersion - 1])
 	{
-		m_RootHistory[m_CurrentVersion] = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
+		m_RootHistory[m_CurrentVersion] = std::make_shared<pst::PersistentMapNode<TKey, TValue>>(key, m_CurrentVersion);
 		return m_RootHistory[m_CurrentVersion].get();
 	}
 
-	ps::RBNode<TKey, TValue>* keyNewParent = ClonePath(key);
+	pst::PersistentMapNode<TKey, TValue>* keyNewParent = ClonePath(key);
 	if (!keyNewParent)
 	{
 		// If we didn't found path to that key that means that we're trying to modify root node. Clone it and return.
@@ -61,8 +61,8 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 		}
 
 		// Create new node
-		keyNewParent->m_Left = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
-		keyNewParent->m_Left->SetColor(m_CurrentVersion, true);
+		keyNewParent->m_Left = std::make_shared<pst::PersistentMapNode<TKey, TValue>>(key, m_CurrentVersion);
+		keyNewParent->m_Left->SetIsRed(m_CurrentVersion, true);
 		InsertFixup(keyNewParent->m_Left.get());
 
 		// Fixup can invalidate node (by cloning it for instance)
@@ -77,8 +77,8 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 	}
 
 	// Create new node
-	keyNewParent->m_Right = std::make_shared<ps::RBNode<TKey, TValue>>(key, m_CurrentVersion);
-	keyNewParent->m_Right->SetColor(m_CurrentVersion, true);
+	keyNewParent->m_Right = std::make_shared<pst::PersistentMapNode<TKey, TValue>>(key, m_CurrentVersion);
+	keyNewParent->m_Right->SetIsRed(m_CurrentVersion, true);
 	InsertFixup(keyNewParent->m_Right.get());
 
 	// Fixup can invalidate node (by cloning it for instance)
@@ -86,7 +86,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Insert(const TKey& ke
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
+inline void pst::PersistentMap<TKey, TValue>::Delete(const TKey& key)
 {
 	assert(m_CurrentVersion >= 0);
 	assert(Search(key) != nullptr);
@@ -96,8 +96,8 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	ClearCurrentVersion();
 
 	// Find parent of node being deleted and clone all path to this parent (including parent itself)
-	ps::RBNode<TKey, TValue>* nodeToDeleteNewParent = ClonePath(key);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> nodeToDelete = nullptr;
+	pst::PersistentMapNode<TKey, TValue>* nodeToDeleteNewParent = ClonePath(key);
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> nodeToDelete = nullptr;
 	if (!nodeToDeleteNewParent)
 	{
 		nodeToDelete = m_RootHistory[m_CurrentVersion - 1];
@@ -117,7 +117,7 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	// 1. Case when node which will replace deletable node has 0 or 1 child
 	if (!nodeToDelete->m_Left)
 	{
-		std::shared_ptr<ps::RBNode<TKey, TValue>> replacementNode = nodeToDelete->m_Right ? nodeToDelete->m_Right->Clone(m_CurrentVersion) : nullptr;
+		std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> replacementNode = nodeToDelete->m_Right ? nodeToDelete->m_Right->Clone(m_CurrentVersion) : nullptr;
 		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, replacementNode);
 		if (requiresFixup)
 		{
@@ -133,7 +133,7 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 
 	if (!nodeToDelete->m_Right)
 	{
-		std::shared_ptr<ps::RBNode<TKey, TValue>> replacementNode = nodeToDelete->m_Left ? nodeToDelete->m_Left->Clone(m_CurrentVersion) : nullptr;
+		std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> replacementNode = nodeToDelete->m_Left ? nodeToDelete->m_Left->Clone(m_CurrentVersion) : nullptr;
 		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, replacementNode);
 		if (requiresFixup)
 		{
@@ -144,8 +144,8 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	}
 
 	// 2. Case when node which will replace deletable node has 2 childs
-	ps::RBNode<TKey, TValue>* replacementNode = nullptr;
-	ps::RBNode<TKey, TValue>* replacementNodeParent = GetMinParent(nodeToDelete->m_Right.get());
+	pst::PersistentMapNode<TKey, TValue>* replacementNode = nullptr;
+	pst::PersistentMapNode<TKey, TValue>* replacementNodeParent = GetMinParent(nodeToDelete->m_Right.get());
 	if (replacementNodeParent)
 	{
 		replacementNode = replacementNodeParent->m_Left.get();
@@ -160,10 +160,10 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 	if (replacementNodeParent == nodeToDelete.get())
 	{
 		// 2a. Case when node which will replace deletable node is deletable node's direct child
-		std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
+		std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
 		Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
 		clonedReplacementNode->m_Left = nodeToDelete->m_Left;
-		clonedReplacementNode->SetColor(m_CurrentVersion, nodeToDelete->IsRed());
+		clonedReplacementNode->SetIsRed(m_CurrentVersion, nodeToDelete->IsRed());
 		if (requiresFixup)
 		{
 			clonedReplacementNode->m_Right = clonedReplacementNode->m_Right ? clonedReplacementNode->m_Right->Clone(m_CurrentVersion) : nullptr;
@@ -175,9 +175,9 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 
 	// 2b. Case when node which will replace deletable node is NOT deletable node's direct child. That means that we need to clone path to this replacementNode
 	auto[nodeToDeleteNewRightChild, replacementNodeNewParent] = ClonePath(nodeToDelete->m_Right.get(), replacementNode->m_Key);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> clonedReplacementNode = replacementNode->Clone(m_CurrentVersion);
 	Transplant(nodeToDelete.get(), nodeToDeleteNewParent, clonedReplacementNode);
-	clonedReplacementNode->SetColor(m_CurrentVersion, nodeToDelete->IsRed());
+	clonedReplacementNode->SetIsRed(m_CurrentVersion, nodeToDelete->IsRed());
 	clonedReplacementNode->m_Left = nodeToDelete->m_Left;
 	clonedReplacementNode->m_Right = nodeToDeleteNewRightChild;
 	replacementNodeNewParent->m_Left = replacementNode->m_Right;
@@ -189,16 +189,16 @@ inline void ps::RBTree<TKey, TValue>::Delete(const TKey& key)
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Search(const TKey& key)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(const TKey& key)
 {
-	Node* root = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	return Search(root, key);
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin()
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin()
 {
-	Node* root = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
 	{
 		return nullptr;
@@ -208,9 +208,9 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin()
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMax()
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax()
 {
-	Node* root = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
 	{
 		return nullptr;
@@ -220,28 +220,28 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMax()
 }
 
 template<typename TKey, typename TValue>
-inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted()
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted()
 {
-	Node* root = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	return DEBUG_CheckIfSorted(root);
 }
 
 template<typename TKey, typename TValue>
-inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB()
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB()
 {
-	Node* root = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
 	{
 		return true;
 	}
 
-	ps::RBNode<TKey, TValue>* minNode = GetMin();
+	pst::PersistentMapNode<TKey, TValue>* minNode = GetMin();
 	int blackNodes = DEBUG_CountBlackNodes(minNode);
 	return !root->IsRed() && DEBUG_CheckIfRB(root, blackNodes);
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMinParent(ps::RBNode<TKey, TValue>* node)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMinParent(pst::PersistentMapNode<TKey, TValue>* node)
 {
 	if (!node->m_Left)
 	{
@@ -258,14 +258,14 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMinParent(ps::RBNo
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetRoot()
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetRoot()
 {
-	Node* root = m_RootHistory.size() > m_CurrentVersion ? m_RootHistory[m_CurrentVersion].get() : nullptr;
+	pst::PersistentMapNode<TKey, TValue>* root = m_RootHistory.size() > m_CurrentVersion ? m_RootHistory[m_CurrentVersion].get() : nullptr;
 	return root;
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::ClearCurrentVersion()
+inline void pst::PersistentMap<TKey, TValue>::ClearCurrentVersion()
 {
 	if (m_RootHistory.size() > m_CurrentVersion)
 	{
@@ -280,10 +280,10 @@ inline void ps::RBTree<TKey, TValue>::ClearCurrentVersion()
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::ClonePath(const TKey& toKey)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::ClonePath(const TKey& toKey)
 {
 	// Handle case when root doesn't exist or it is a target node
-	ps::RBNode<TKey, TValue>* oldRoot = m_RootHistory[m_CurrentVersion - 1].get();
+	pst::PersistentMapNode<TKey, TValue>* oldRoot = m_RootHistory[m_CurrentVersion - 1].get();
 	if (!oldRoot || oldRoot->m_Key == toKey)
 	{
 		return nullptr;
@@ -295,26 +295,27 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::ClonePath(const TKey&
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixNode)
+inline void pst::PersistentMap<TKey, TValue>::InsertFixup(pst::PersistentMapNode<TKey, TValue>* fixNode)
 {
 	// TODO: Consider caching parent and grandparent
+
 	// All parents has been cloned already. Uncles has not.
-	std::vector<ps::RBNode<TKey, TValue>*> parents = BuildPath(fixNode);
+	std::vector<pst::PersistentMapNode<TKey, TValue>*> parents = BuildPath(fixNode);
 	auto getParent = [&parents]() { return parents[parents.size() - 1]; };
 	auto getGrandParent = [&parents]() { return parents[parents.size() - 2]; };
 	while (getParent() && getParent()->IsRed())
 	{
 		if (getParent() == getGrandParent()->m_Left.get())
 		{
-			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Right.get();
+			pst::PersistentMapNode<TKey, TValue>* uncle = getGrandParent()->m_Right.get();
 			if (uncle && uncle->IsRed())
 			{
 				// Case 1
-				getParent()->SetColor(m_CurrentVersion, false);
+				getParent()->SetIsRed(m_CurrentVersion, false);
 				getGrandParent()->m_Right = uncle->Clone(m_CurrentVersion);
 				uncle = getGrandParent()->m_Right.get();
-				uncle->SetColor(m_CurrentVersion, false);
-				getGrandParent()->SetColor(m_CurrentVersion, true);
+				uncle->SetIsRed(m_CurrentVersion, false);
+				getGrandParent()->SetIsRed(m_CurrentVersion, true);
 				fixNode = getGrandParent();
 				parents.pop_back();
 				parents.pop_back();
@@ -329,18 +330,18 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixN
 
 					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
 					fixNode->m_Right = fixNode->m_Right->Clone(m_CurrentVersion);
-					ps::RBNode<TKey, TValue>* willBeNewParent = fixNode->m_Right.get();
+					pst::PersistentMapNode<TKey, TValue>* willBeNewParent = fixNode->m_Right.get();
 					LeftRotate(fixNode, getParent());
 					parents.push_back(willBeNewParent);
 				}
 
 				// Case 3. No else intended
-				getParent()->SetColor(m_CurrentVersion, false);
-				getGrandParent()->SetColor(m_CurrentVersion, true);
+				getParent()->SetIsRed(m_CurrentVersion, false);
+				getGrandParent()->SetIsRed(m_CurrentVersion, true);
 
 				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
 				getGrandParent()->m_Left = getGrandParent()->m_Left->Clone(m_CurrentVersion);
-				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
+				pst::PersistentMapNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Left.get();
 				RightRotate(getGrandParent(), parents[parents.size() - 3]);
 				parents.push_back(willBeNewParent);
 
@@ -350,19 +351,17 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixN
 		}
 		else
 		{
-			/////////////////////////////////////////
-			// TODO: AVOID DUPLICATING THIS LOGIC !!!
-			/////////////////////////////////////////
+			// TODO: Try to find way to avoid this symmetric logic. Same for DeleteFixup!
 
-			ps::RBNode<TKey, TValue>* uncle = getGrandParent()->m_Left.get();
+			pst::PersistentMapNode<TKey, TValue>* uncle = getGrandParent()->m_Left.get();
 			if (uncle && uncle->IsRed())
 			{
 				// Case 1
-				getParent()->SetColor(m_CurrentVersion, false);
+				getParent()->SetIsRed(m_CurrentVersion, false);
 				getGrandParent()->m_Left = uncle->Clone(m_CurrentVersion);
 				uncle = getGrandParent()->m_Left.get();
-				uncle->SetColor(m_CurrentVersion, false);
-				getGrandParent()->SetColor(m_CurrentVersion, true);
+				uncle->SetIsRed(m_CurrentVersion, false);
+				getGrandParent()->SetIsRed(m_CurrentVersion, true);
 				fixNode = getGrandParent();
 				parents.pop_back();
 				parents.pop_back();
@@ -377,18 +376,18 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixN
 
 					// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
 					fixNode->m_Left = fixNode->m_Left->Clone(m_CurrentVersion);
-					ps::RBNode<TKey, TValue>* willBeNewParent = fixNode->m_Left.get();
+					pst::PersistentMapNode<TKey, TValue>* willBeNewParent = fixNode->m_Left.get();
 					RightRotate(fixNode, getParent());
 					parents.push_back(willBeNewParent);
 				}
 
 				// Case 3. No else intended
-				getParent()->SetColor(m_CurrentVersion, false);
-				getGrandParent()->SetColor(m_CurrentVersion, true);
+				getParent()->SetIsRed(m_CurrentVersion, false);
+				getGrandParent()->SetIsRed(m_CurrentVersion, true);
 
 				// Clone needed node before rotation, remember what node is being rotated and then restore parents after rotation
 				getGrandParent()->m_Right = getGrandParent()->m_Right->Clone(m_CurrentVersion);
-				ps::RBNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Right.get();
+				pst::PersistentMapNode<TKey, TValue>* willBeNewParent = getGrandParent()->m_Right.get();
 				LeftRotate(getGrandParent(), parents[parents.size() - 3]);
 				parents.push_back(willBeNewParent);
 
@@ -398,18 +397,18 @@ inline void ps::RBTree<TKey, TValue>::InsertFixup(ps::RBNode<TKey, TValue>* fixN
 		}
 	}
 
-	GetRoot()->SetColor(m_CurrentVersion, false);
+	GetRoot()->SetIsRed(m_CurrentVersion, false);
 }
 
 template<typename TKey, typename TValue>
-inline std::vector<ps::RBNode<TKey, TValue>*> ps::RBTree<TKey, TValue>::BuildPath(ps::RBNode<TKey, TValue>* toNode)
+inline std::vector<pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKey, TValue>::BuildPath(pst::PersistentMapNode<TKey, TValue>* toNode)
 {
 	assert(toNode);
-	std::vector<ps::RBNode<TKey, TValue>*> path;
+	std::vector<pst::PersistentMapNode<TKey, TValue>*> path;
 
 	// Parent of root is always nullptr
 	path.push_back(nullptr);
-	ps::RBNode<TKey, TValue>* node = GetRoot();
+	pst::PersistentMapNode<TKey, TValue>* node = GetRoot();
 	while (node && node->m_Key != toNode->m_Key)
 	{
 		path.push_back(node);
@@ -425,18 +424,20 @@ inline std::vector<ps::RBNode<TKey, TValue>*> ps::RBTree<TKey, TValue>::BuildPat
 
 	if (!node)
 	{
-		return std::vector<ps::RBNode<TKey, TValue>*>();
+		return std::vector<pst::PersistentMapNode<TKey, TValue>*>();
 	}
 
 	return path;
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::RightRotate(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+inline void pst::PersistentMap<TKey, TValue>::RightRotate(pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent)
 {
+	// TODO: Unite Left and Right rotate functions?
+
 	// Important to keep shared_ptrs there. This way object won't be removed during swapping pointers
-	std::shared_ptr<ps::RBNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> childNode = target->m_Left;
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> childNode = target->m_Left;
 	targetNode->m_Left = childNode->m_Right;
 	if (!targetParent)
 	{
@@ -455,11 +456,11 @@ inline void ps::RBTree<TKey, TValue>::RightRotate(ps::RBNode<TKey, TValue>* targ
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::LeftRotate(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+inline void pst::PersistentMap<TKey, TValue>::LeftRotate(pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent)
 {
 	// Important to keep shared_ptr there. This way object won't be removed during swapping pointers
-	std::shared_ptr<ps::RBNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> childNode = target->m_Right;
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> targetNode = GetSharedPtr(target, targetParent);
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> childNode = target->m_Right;
 	targetNode->m_Right = childNode->m_Left;
 	if (!targetParent)
 	{
@@ -478,7 +479,7 @@ inline void ps::RBTree<TKey, TValue>::LeftRotate(ps::RBNode<TKey, TValue>* targe
 }
 
 template<typename TKey, typename TValue>
-inline std::shared_ptr<ps::RBNode<TKey, TValue>> ps::RBTree<TKey, TValue>::GetSharedPtr(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent)
+inline std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> pst::PersistentMap<TKey, TValue>::GetSharedPtr(pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent)
 {
 	if (!targetParent)
 	{
@@ -494,10 +495,10 @@ inline std::shared_ptr<ps::RBNode<TKey, TValue>> ps::RBTree<TKey, TValue>::GetSh
 }
 
 template<typename TKey, typename TValue>
-inline int ps::RBTree<TKey, TValue>::DEBUG_CountBlackNodes(ps::RBNode<TKey, TValue>* toNode)
+inline int pst::PersistentMap<TKey, TValue>::DEBUG_CountBlackNodes(pst::PersistentMapNode<TKey, TValue>* toNode)
 {
 	int blackNodes = 0;
-	std::vector<ps::RBNode<TKey, TValue>*> path = BuildPath(toNode);
+	std::vector<pst::PersistentMapNode<TKey, TValue>*> path = BuildPath(toNode);
 	for (auto* node : path)
 	{
 		if (node && !node->IsRed())
@@ -515,7 +516,7 @@ inline int ps::RBTree<TKey, TValue>::DEBUG_CountBlackNodes(ps::RBNode<TKey, TVal
 }
 
 template<typename TKey, typename TValue>
-inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB(ps::RBNode<TKey, TValue>* node, int expectedBlackNodes)
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB(pst::PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes)
 {
 	if (!node)
 	{
@@ -545,10 +546,10 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfRB(ps::RBNode<TKey, TValue>* 
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixNode, ps::RBNode<TKey, TValue>* parentForNullNode)
+inline void pst::PersistentMap<TKey, TValue>::DeleteFixup(pst::PersistentMapNode<TKey, TValue>* fixNode, pst::PersistentMapNode<TKey, TValue>* parentForNullNode)
 {
 	// All parents has been cloned already. Sublings has not.
-	std::vector<ps::RBNode<TKey, TValue>*> parents = fixNode ? BuildPath(fixNode) : BuildPath(parentForNullNode);
+	std::vector<pst::PersistentMapNode<TKey, TValue>*> parents = fixNode ? BuildPath(fixNode) : BuildPath(parentForNullNode);
 	if (!fixNode)
 	{
 		assert(parentForNullNode);
@@ -561,18 +562,18 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 	{
 		if (fixNode == getParent()->m_Left.get())
 		{
-			ps::RBNode<TKey, TValue>* subling = getParent()->m_Right.get();
+			pst::PersistentMapNode<TKey, TValue>* subling = getParent()->m_Right.get();
 			if (subling && subling->IsRed())
 			{
 				// Case 1
 				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
 				subling = getParent()->m_Right.get();
-				subling->SetColor(m_CurrentVersion, false);
-				getParent()->SetColor(m_CurrentVersion, true);
+				subling->SetIsRed(m_CurrentVersion, false);
+				getParent()->SetIsRed(m_CurrentVersion, true);
 				LeftRotate(getParent(), getGrandParent());
 				
 				// Restore parents
-				ps::RBNode<TKey, TValue>* parent = parents.back();
+				pst::PersistentMapNode<TKey, TValue>* parent = parents.back();
 				parents.pop_back();
 				parents.push_back(subling);
 				parents.push_back(parent);
@@ -586,7 +587,7 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 				// Case 2. Both subling's children are black
 				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
 				subling = getParent()->m_Right.get();
-				subling->SetColor(m_CurrentVersion, true);
+				subling->SetIsRed(m_CurrentVersion, true);
 				fixNode = getParent();
 				parents.pop_back();
 			}
@@ -599,8 +600,8 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 					getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
 					subling = getParent()->m_Right.get();
 					subling->m_Left = subling->m_Left->Clone(m_CurrentVersion);
-					subling->m_Left->SetColor(m_CurrentVersion, false);
-					subling->SetColor(m_CurrentVersion, true);
+					subling->m_Left->SetIsRed(m_CurrentVersion, false);
+					subling->SetIsRed(m_CurrentVersion, true);
 					RightRotate(subling, getParent());
 
 					// Find new subling
@@ -611,13 +612,13 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 				getParent()->m_Right = getParent()->m_Right->Clone(m_CurrentVersion);
 				subling = getParent()->m_Right.get();
 				subling->m_Right = subling->m_Right->Clone(m_CurrentVersion);
-				subling->SetColor(m_CurrentVersion, getParent()->IsRed());
-				getParent()->SetColor(m_CurrentVersion, false);
-				subling->m_Right->SetColor(m_CurrentVersion, false);
+				subling->SetIsRed(m_CurrentVersion, getParent()->IsRed());
+				getParent()->SetIsRed(m_CurrentVersion, false);
+				subling->m_Right->SetIsRed(m_CurrentVersion, false);
 				LeftRotate(getParent(), getGrandParent());
 
 				// Restore parents
-				ps::RBNode<TKey, TValue>* parent = parents.back();
+				pst::PersistentMapNode<TKey, TValue>* parent = parents.back();
 				parents.pop_back();
 				parents.push_back(subling);
 				parents.push_back(parent);
@@ -627,18 +628,18 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 		}
 		else
 		{
-			ps::RBNode<TKey, TValue>* subling = getParent()->m_Left.get();
+			pst::PersistentMapNode<TKey, TValue>* subling = getParent()->m_Left.get();
 			if (subling && subling->IsRed())
 			{
 				// Case 1
 				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
 				subling = getParent()->m_Left.get();
-				subling->SetColor(m_CurrentVersion, false);
-				getParent()->SetColor(m_CurrentVersion, true);
+				subling->SetIsRed(m_CurrentVersion, false);
+				getParent()->SetIsRed(m_CurrentVersion, true);
 				RightRotate(getParent(), getGrandParent());
 
 				// Restore parents
-				ps::RBNode<TKey, TValue>* parent = parents.back();
+				pst::PersistentMapNode<TKey, TValue>* parent = parents.back();
 				parents.pop_back();
 				parents.push_back(subling);
 				parents.push_back(parent);
@@ -652,7 +653,7 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 				// Case 2. Both subling's children are black
 				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
 				subling = getParent()->m_Left.get();
-				subling->SetColor(m_CurrentVersion, true);
+				subling->SetIsRed(m_CurrentVersion, true);
 				fixNode = getParent();
 				parents.pop_back();
 			}
@@ -665,8 +666,8 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 					getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
 					subling = getParent()->m_Left.get();
 					subling->m_Right = subling->m_Right->Clone(m_CurrentVersion);
-					subling->m_Right->SetColor(m_CurrentVersion, false);
-					subling->SetColor(m_CurrentVersion, true);
+					subling->m_Right->SetIsRed(m_CurrentVersion, false);
+					subling->SetIsRed(m_CurrentVersion, true);
 					LeftRotate(subling, getParent());
 
 					// Find new subling
@@ -677,13 +678,13 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 				getParent()->m_Left = getParent()->m_Left->Clone(m_CurrentVersion);
 				subling = getParent()->m_Left.get();
 				subling->m_Left = subling->m_Left->Clone(m_CurrentVersion);
-				subling->SetColor(m_CurrentVersion, getParent()->IsRed());
-				getParent()->SetColor(m_CurrentVersion, false);
-				subling->m_Left->SetColor(m_CurrentVersion, false);
+				subling->SetIsRed(m_CurrentVersion, getParent()->IsRed());
+				getParent()->SetIsRed(m_CurrentVersion, false);
+				subling->m_Left->SetIsRed(m_CurrentVersion, false);
 				RightRotate(getParent(), getGrandParent());
 
 				// Restore parents
-				ps::RBNode<TKey, TValue>* parent = parents.back();
+				pst::PersistentMapNode<TKey, TValue>* parent = parents.back();
 				parents.pop_back();
 				parents.push_back(subling);
 				parents.push_back(parent);
@@ -694,16 +695,16 @@ inline void ps::RBTree<TKey, TValue>::DeleteFixup(ps::RBNode<TKey, TValue>* fixN
 	}
 
 	// Always root node - so it should be cloned already
-	fixNode->SetColor(m_CurrentVersion, false);
+	fixNode->SetIsRed(m_CurrentVersion, false);
 }
 
 template<typename TKey, typename TValue>
-inline std::tuple<std::shared_ptr<ps::RBNode<TKey, TValue>>, ps::RBNode<TKey, TValue>*> ps::RBTree<TKey, TValue>::ClonePath(
-	ps::RBNode<TKey, TValue>* from, const TKey& toKey)
+inline std::tuple<std::shared_ptr<pst::PersistentMapNode<TKey, TValue>>, pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKey, TValue>::ClonePath(
+	pst::PersistentMapNode<TKey, TValue>* from, const TKey& toKey)
 {
 	assert(from->m_Key != toKey);
-	std::shared_ptr<ps::RBNode<TKey, TValue>> newFrom = from->Clone(m_CurrentVersion);
-	ps::RBNode<TKey, TValue>* newNode = newFrom.get();
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> newFrom = from->Clone(m_CurrentVersion);
+	pst::PersistentMapNode<TKey, TValue>* newNode = newFrom.get();
 	while (true)
 	{
 		assert(newNode->m_Key != toKey);
@@ -749,8 +750,8 @@ inline std::tuple<std::shared_ptr<ps::RBNode<TKey, TValue>>, ps::RBNode<TKey, TV
 }
 
 template<typename TKey, typename TValue>
-inline void ps::RBTree<TKey, TValue>::Transplant(ps::RBNode<TKey, TValue>* target, ps::RBNode<TKey, TValue>* targetParent, 
-	std::shared_ptr<ps::RBNode<TKey, TValue>> source)
+inline void pst::PersistentMap<TKey, TValue>::Transplant(pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent, 
+	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> source)
 {
 	if (!targetParent)
 	{
@@ -769,7 +770,7 @@ inline void ps::RBTree<TKey, TValue>::Transplant(ps::RBNode<TKey, TValue>* targe
 }
 
 template<typename TKey, typename TValue>
-inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted(ps::RBNode<TKey, TValue>* node)
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted(pst::PersistentMapNode<TKey, TValue>* node)
 {
 	if (!node)
 	{
@@ -790,7 +791,7 @@ inline bool ps::RBTree<TKey, TValue>::DEBUG_CheckIfSorted(ps::RBNode<TKey, TValu
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Search(ps::RBNode<TKey, TValue>* node, const TKey& key)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(pst::PersistentMapNode<TKey, TValue>* node, const TKey& key)
 {
 	while (node && node->m_Key != key)
 	{
@@ -808,7 +809,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::Search(ps::RBNode<TKe
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin(ps::RBNode<TKey, TValue>* node)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin(pst::PersistentMapNode<TKey, TValue>* node)
 {
 	while (node->m_Left)
 	{
@@ -819,7 +820,7 @@ inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMin(ps::RBNode<TKe
 }
 
 template<typename TKey, typename TValue>
-inline ps::RBNode<TKey, TValue>* ps::RBTree<TKey, TValue>::GetMax(ps::RBNode<TKey, TValue>* node)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax(pst::PersistentMapNode<TKey, TValue>* node)
 {
 	while (node->m_Right)
 	{

@@ -7,10 +7,8 @@
 #include <string>
 #include <string_view>
 
-namespace ps
+namespace pst
 {
-	class PlayerInfo;
-
 	class PlayersStorage
 	{
 	public:
@@ -21,6 +19,6 @@ namespace ps
 		int GetPlayerRating(const std::string& playerName);
 
 	private:
-		RBTree<std::string, int> m_PlayerRatings;
+		PersistentMap<std::string, int> m_PlayerRatings;
 	};
 }
