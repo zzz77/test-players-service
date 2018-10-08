@@ -18,7 +18,7 @@
     <ClCompile Include="Sources\DataModel\PlayersStorage.cpp">
       <Filter>Sources\DataModel</Filter>
     </ClCompile>
-    <ClCompile Include="Sources\CoreLib\RBTree.cpp">
+    <ClCompile Include="Sources\CoreLib\PersistentMap.cpp">
       <Filter>Sources\CoreLib</Filter>
     </ClCompile>
   </ItemGroup>
@@ -26,12 +26,12 @@
     <ClInclude Include="Sources\DataModel\PlayersStorage.h">
       <Filter>Sources\DataModel</Filter>
     </ClInclude>
-    <ClInclude Include="Sources\CoreLib\RBTree.h">
+    <ClInclude Include="Sources\CoreLib\PersistentMap.h">
       <Filter>Sources\CoreLib</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Sources\CoreLib\RBTree.inl">
+    <None Include="Sources\CoreLib\PersistentMap.inl">
       <Filter>Sources\CoreLib</Filter>
     </None>
   </ItemGroup>

@@ -36,7 +36,7 @@ namespace pst
 			return std::make_shared<PersistentMapNode>(*this, currentVersion);
 		}
 
-		void SetIsRed(int currentVersion, bool red)
+		void SetIsRed([[maybe_unused]] int currentVersion, bool red)
 		{
 			// TODO: Extend version check to changing other node's data and to track duplicate clones calls
 			assert(m_CreateVersion == currentVersion);
@@ -135,4 +135,4 @@ namespace pst
 	};
 }
 
-#include "RBTree.inl"
+#include "PersistentMap.inl"

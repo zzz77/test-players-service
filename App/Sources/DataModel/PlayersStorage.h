@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../CoreLib/RBTree.h"
+#include "../CoreLib/PersistentMap.h"
 
 #include <functional>
 #include <map>
