@@ -217,7 +217,7 @@ bool pst::PersistentMapTest::CheckIfTreeIsRB(const pst::PersistentMap<TKey, TVal
 
 	if (!node->m_Left || !node->m_Right)
 	{
-		int blackNodes = CountBlackNodes(map, node);
+		const int blackNodes = CountBlackNodes(map, node);
 		if (blackNodes != expectedBlackNodes)
 		{
 			return false;

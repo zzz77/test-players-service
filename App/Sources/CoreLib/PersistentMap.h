@@ -75,7 +75,7 @@ namespace pst
 		/// Resets root for current version
 		void ClearCurrentVersion();
 
-		/// Clones previous version of [root; toKey)-nodes and insertes it into current version root.
+		/// Clones previous version of [root; toKey)-nodes and inserts it into current version root.
 		/// Node with m_Key == toKey is not cloned if it exists.
 		/// Returns current version of toKey's parent node.
 		PersistentMapNode<TKey, TValue>* ClonePath(const TKey& toKey);

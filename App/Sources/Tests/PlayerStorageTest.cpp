@@ -14,8 +14,8 @@ void pst::PlayerStorageTest::Run()
 void pst::PlayerStorageTest::TestRegistration()
 {
 	pst::PlayersStorage storage;
-	std::string nickname1 = "Baron_Von_Awesome";
-	std::string nickname2 = "Mrs.Wonderful";
+	const std::string nickname1 = "Baron_Von_Awesome";
+	const std::string nickname2 = "Mrs.Wonderful";
 	assert(storage.GetPlayerRating(nickname1) == -1);
 	assert(storage.GetPlayerRating(nickname2) == -1);
 	storage.RegisterPlayerResult(nickname1, 1000);
@@ -34,8 +34,8 @@ void pst::PlayerStorageTest::TestRegistration()
 void pst::PlayerStorageTest::TestRollback()
 {
 	pst::PlayersStorage storage;
-	std::string nickname1 = "sashagrey720hd";
-	std::string nickname2 = "Toastoftheundead";
+	const std::string nickname1 = "sashagrey720hd";
+	const std::string nickname2 = "Toastoftheundead";
 	storage.RegisterPlayerResult(nickname1, 1000);
 	storage.RegisterPlayerResult(nickname2, 2000);
 	storage.Rollback(2);
