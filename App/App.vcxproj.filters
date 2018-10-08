@@ -10,6 +10,9 @@
     <Filter Include="Sources\CoreLib">
       <UniqueIdentifier>{79e7946d-af36-41c7-8818-dd74be7666d3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sources\Tests">
+      <UniqueIdentifier>{9aab9167-1050-485d-9f6b-0edc06a3b3fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Sources\App.cpp">
@@ -21,6 +24,12 @@
     <ClCompile Include="Sources\CoreLib\PersistentMap.cpp">
       <Filter>Sources\CoreLib</Filter>
     </ClCompile>
+    <ClCompile Include="Sources\Tests\PersistentMapTest.cpp">
+      <Filter>Sources\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="Sources\Tests\PlayerStorageTest.cpp">
+      <Filter>Sources\Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Sources\DataModel\PlayersStorage.h">
@@ -28,6 +37,12 @@
     </ClInclude>
     <ClInclude Include="Sources\CoreLib\PersistentMap.h">
       <Filter>Sources\CoreLib</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\Tests\PersistentMapTest.h">
+      <Filter>Sources\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="Sources\Tests\PlayerStorageTest.h">
+      <Filter>Sources\Tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

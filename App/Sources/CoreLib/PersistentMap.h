@@ -7,6 +7,8 @@
 
 namespace pst
 {
+	class PersistentMapTest;
+
 	template <typename TKey, typename TValue>
 	class PersistentMapNode
 	{
@@ -39,6 +41,8 @@ namespace pst
 	template <typename TKey, typename TValue>
 	class PersistentMap
 	{
+		// TODO: Not cool but for proper testing without friend class more comprehensive API is needed
+		friend class PersistentMapTest;
 	public:
 		PersistentMap();
 
@@ -54,9 +58,6 @@ namespace pst
 		const PersistentMapNode<TKey, TValue>* GetMin() const;
 		const PersistentMapNode<TKey, TValue>* GetMax() const;
 
-		bool DEBUG_CheckIfSorted() const;
-		bool DEBUG_CheckIfRB() const;
-
 	private:
 		const PersistentMapNode<TKey, TValue>* Search(const PersistentMapNode<TKey, TValue>* node, const TKey& key) const;
 		PersistentMapNode<TKey, TValue>* Search(PersistentMapNode<TKey, TValue>* node, const TKey& key);
@@ -70,6 +71,8 @@ namespace pst
 
 		const PersistentMapNode<TKey, TValue>* GetRoot() const;
 		PersistentMapNode<TKey, TValue>* GetRoot();
+
+		/// Resets root for current version
 		void ClearCurrentVersion();
 
 		/// Clones previous version of [root; toKey)-nodes and insertes it into current version root.
@@ -108,12 +111,9 @@ namespace pst
 
 		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
 		std::vector<PersistentMapNode<TKey, TValue>*> BuildPath(PersistentMapNode<TKey, TValue>* toNode);
-		std::vector<const PersistentMapNode<TKey, TValue>*> BuildPath(const PersistentMapNode<TKey, TValue>* toNode) const;
 
-		// TODO: Move to separate class with tests
-		bool DEBUG_CheckIfSorted(const PersistentMapNode<TKey, TValue>* node) const;
-		bool DEBUG_CheckIfRB(const PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes) const;
-		int DEBUG_CountBlackNodes(const PersistentMapNode<TKey, TValue>* toNode) const;
+		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
+		std::vector<const PersistentMapNode<TKey, TValue>*> BuildPath(const PersistentMapNode<TKey, TValue>* toNode) const;
 
 		std::vector<std::shared_ptr<PersistentMapNode<TKey, TValue>>> m_RootHistory;
 		int m_CurrentVersion;

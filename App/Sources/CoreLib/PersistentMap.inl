@@ -253,26 +253,6 @@ inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TVal
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted() const
-{
-	return DEBUG_CheckIfSorted(GetRoot());
-}
-
-template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB() const
-{
-	const pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
-	if (!root)
-	{
-		return true;
-	}
-
-	const pst::PersistentMapNode<TKey, TValue>* minNode = GetMin();
-	int blackNodes = DEBUG_CountBlackNodes(minNode);
-	return !root->IsRed() && DEBUG_CheckIfRB(root, blackNodes);
-}
-
-template<typename TKey, typename TValue>
 inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetRoot() const
 {
 	pst::PersistentMapNode<TKey, TValue>* root = m_RootHistory.size() > m_CurrentVersion ? m_RootHistory[m_CurrentVersion].get() : nullptr;
@@ -548,57 +528,6 @@ inline std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> pst::PersistentMap<
 }
 
 template<typename TKey, typename TValue>
-inline int pst::PersistentMap<TKey, TValue>::DEBUG_CountBlackNodes(const pst::PersistentMapNode<TKey, TValue>* toNode) const
-{
-	int blackNodes = 0;
-	std::vector<const pst::PersistentMapNode<TKey, TValue>*> path = BuildPath(toNode);
-	for (auto* node : path)
-	{
-		if (node && !node->IsRed())
-		{
-			blackNodes++;
-		}
-	}
-
-	if (!toNode->IsRed())
-	{
-		blackNodes++;
-	}
-
-	return blackNodes;
-}
-
-template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB(const pst::PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes)const
-{
-	if (!node)
-	{
-		return true;
-	}
-
-	if (node->IsRed() && node->m_Left && node->m_Left->IsRed())
-	{
-		return false;
-	}
-
-	if (node->IsRed() && node->m_Right && node->m_Right->IsRed())
-	{
-		return false;
-	}
-
-	if (!node->m_Left || !node->m_Right)
-	{
-		int blackNodes = DEBUG_CountBlackNodes(node);
-		if (blackNodes != expectedBlackNodes)
-		{
-			return false;
-		}
-	}
-
-	return DEBUG_CheckIfRB(node->m_Left.get(), expectedBlackNodes) && DEBUG_CheckIfRB(node->m_Right.get(), expectedBlackNodes);
-}
-
-template<typename TKey, typename TValue>
 inline void pst::PersistentMap<TKey, TValue>::DeleteFixup(pst::PersistentMapNode<TKey, TValue>* fixNode, pst::PersistentMapNode<TKey, TValue>* parentForNullNode)
 {
 	// All parents has been cloned already. Sublings has not.
@@ -823,27 +752,6 @@ inline void pst::PersistentMap<TKey, TValue>::Transplant(const pst::PersistentMa
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted(const pst::PersistentMapNode<TKey, TValue>* node) const
-{
-	if (!node)
-	{
-		return true;
-	}
-
-	if (node->m_Left && node->m_Left->m_Key > node->m_Key)
-	{
-		return false;
-	}
-
-	if (node->m_Right && node->m_Right->m_Key < node->m_Key)
-	{
-		return false;
-	}
-
-	return DEBUG_CheckIfSorted(node->m_Left.get()) && DEBUG_CheckIfSorted(node->m_Right.get());
-}
-
-template<typename TKey, typename TValue>
 inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(const pst::PersistentMapNode<TKey, TValue>* node, const TKey& key) const
 {
 	while (node && node->m_Key != key)
@@ -860,6 +768,7 @@ inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TVal
 
 	return node;
 }
+
 template<typename TKey, typename TValue>
 inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(pst::PersistentMapNode<TKey, TValue>* node, const TKey& key)
 {

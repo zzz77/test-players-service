@@ -97,10 +97,14 @@
     <ClCompile Include="Sources\App.cpp" />
     <ClCompile Include="Sources\CoreLib\PersistentMap.cpp" />
     <ClCompile Include="Sources\DataModel\PlayersStorage.cpp" />
+    <ClCompile Include="Sources\Tests\PersistentMapTest.cpp" />
+    <ClCompile Include="Sources\Tests\PlayerStorageTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Sources\CoreLib\PersistentMap.h" />
     <ClInclude Include="Sources\DataModel\PlayersStorage.h" />
+    <ClInclude Include="Sources\Tests\PersistentMapTest.h" />
+    <ClInclude Include="Sources\Tests\PlayerStorageTest.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Sources\CoreLib\PersistentMap.inl" />
