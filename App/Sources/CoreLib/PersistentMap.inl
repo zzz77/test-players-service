@@ -8,6 +8,34 @@
 #include <memory>
 
 template<typename TKey, typename TValue>
+inline pst::PersistentMapNode<TKey, TValue>::PersistentMapNode(const TKey& key, int currentVersion)
+	: m_Key(key)
+	, m_CreateVersion(currentVersion)
+	, m_Red(false)
+	, m_Value(TValue())
+	, m_Left(nullptr)
+	, m_Right(nullptr)
+{
+}
+
+template<typename TKey, typename TValue>
+inline pst::PersistentMapNode<TKey, TValue>::PersistentMapNode(const PersistentMapNode<TKey, TValue>& other, int currentVersion)
+	: m_Key(other.m_Key)
+	, m_CreateVersion(currentVersion)
+	, m_Red(other.m_Red)
+	, m_Value(other.m_Value)
+	, m_Left(other.m_Left)
+	, m_Right(other.m_Right)
+{
+}
+
+template<typename TKey, typename TValue>
+inline std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> pst::PersistentMapNode<TKey, TValue>::Clone(int currentVersion) const
+{
+	return std::make_shared<PersistentMapNode<TKey, TValue>>(*this, currentVersion);
+}
+
+template<typename TKey, typename TValue>
 inline pst::PersistentMap<TKey, TValue>::PersistentMap()
 	: m_CurrentVersion(0)
 {
@@ -66,7 +94,7 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::I
 		InsertFixup(keyNewParent->m_Left.get());
 
 		// Fixup can invalidate node (by cloning it for instance)
-		return Search(key);
+		return Search(GetRoot(), key);
 	}
 
 	if (keyNewParent->m_Right)
@@ -82,14 +110,20 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::I
 	InsertFixup(keyNewParent->m_Right.get());
 
 	// Fixup can invalidate node (by cloning it for instance)
-	return Search(key);
+	return Search(GetRoot(), key);
 }
 
 template<typename TKey, typename TValue>
 inline void pst::PersistentMap<TKey, TValue>::Delete(const TKey& key)
 {
+	if (!Search(key))
+	{
+		// TODO: Can be optimized
+		// There is nothing to delete
+		return;
+	}
+
 	assert(m_CurrentVersion >= 0);
-	assert(Search(key) != nullptr);
 	m_CurrentVersion++;
 
 	// Firstly we need to clear this version (in case of rollback - it could contain rollback'd changes)
@@ -145,7 +179,7 @@ inline void pst::PersistentMap<TKey, TValue>::Delete(const TKey& key)
 
 	// 2. Case when node which will replace deletable node has 2 childs
 	pst::PersistentMapNode<TKey, TValue>* replacementNode = nullptr;
-	pst::PersistentMapNode<TKey, TValue>* replacementNodeParent = GetMinParent(nodeToDelete->m_Right.get());
+	pst::PersistentMapNode<TKey, TValue>* replacementNodeParent = GetMinParent(nodeToDelete->m_Right.get());;
 	if (replacementNodeParent)
 	{
 		replacementNode = replacementNodeParent->m_Left.get();
@@ -189,16 +223,15 @@ inline void pst::PersistentMap<TKey, TValue>::Delete(const TKey& key)
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(const TKey& key)
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(const TKey& key) const
 {
-	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
-	return Search(root, key);
+	return Search(GetRoot(), key);
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin()
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin() const
 {
-	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
+	const pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
 	{
 		return nullptr;
@@ -208,7 +241,7 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::G
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax()
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax() const
 {
 	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
@@ -220,41 +253,30 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::G
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted()
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted() const
 {
-	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
-	return DEBUG_CheckIfSorted(root);
+	return DEBUG_CheckIfSorted(GetRoot());
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB()
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB() const
 {
-	pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
+	const pst::PersistentMapNode<TKey, TValue>* root = GetRoot();
 	if (!root)
 	{
 		return true;
 	}
 
-	pst::PersistentMapNode<TKey, TValue>* minNode = GetMin();
+	const pst::PersistentMapNode<TKey, TValue>* minNode = GetMin();
 	int blackNodes = DEBUG_CountBlackNodes(minNode);
 	return !root->IsRed() && DEBUG_CheckIfRB(root, blackNodes);
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMinParent(pst::PersistentMapNode<TKey, TValue>* node)
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetRoot() const
 {
-	if (!node->m_Left)
-	{
-		// This is minimal node and we cannot aqcuire its parent
-		return nullptr;
-	}
-
-	while (node->m_Left->m_Left)
-	{
-		node = node->m_Left.get();
-	}
-
-	return node;
+	pst::PersistentMapNode<TKey, TValue>* root = m_RootHistory.size() > m_CurrentVersion ? m_RootHistory[m_CurrentVersion].get() : nullptr;
+	return root;
 }
 
 template<typename TKey, typename TValue>
@@ -403,6 +425,7 @@ inline void pst::PersistentMap<TKey, TValue>::InsertFixup(pst::PersistentMapNode
 template<typename TKey, typename TValue>
 inline std::vector<pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKey, TValue>::BuildPath(pst::PersistentMapNode<TKey, TValue>* toNode)
 {
+	// TODO: Try to avoid duplicating logic with const-method
 	assert(toNode);
 	std::vector<pst::PersistentMapNode<TKey, TValue>*> path;
 
@@ -425,6 +448,36 @@ inline std::vector<pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKe
 	if (!node)
 	{
 		return std::vector<pst::PersistentMapNode<TKey, TValue>*>();
+	}
+
+	return path;
+}
+
+template<typename TKey, typename TValue>
+inline std::vector<const pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKey, TValue>::BuildPath(const pst::PersistentMapNode<TKey, TValue>* toNode) const
+{
+	assert(toNode);
+	std::vector<const pst::PersistentMapNode<TKey, TValue>*> path;
+
+	// Parent of root is always nullptr
+	path.push_back(nullptr);
+	const pst::PersistentMapNode<TKey, TValue>* node = GetRoot();
+	while (node && node->m_Key != toNode->m_Key)
+	{
+		path.push_back(node);
+		if (toNode->m_Key < node->m_Key)
+		{
+			node = node->m_Left.get();
+		}
+		else
+		{
+			node = node->m_Right.get();
+		}
+	}
+
+	if (!node)
+	{
+		return std::vector<const pst::PersistentMapNode<TKey, TValue>*>();
 	}
 
 	return path;
@@ -495,10 +548,10 @@ inline std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> pst::PersistentMap<
 }
 
 template<typename TKey, typename TValue>
-inline int pst::PersistentMap<TKey, TValue>::DEBUG_CountBlackNodes(pst::PersistentMapNode<TKey, TValue>* toNode)
+inline int pst::PersistentMap<TKey, TValue>::DEBUG_CountBlackNodes(const pst::PersistentMapNode<TKey, TValue>* toNode) const
 {
 	int blackNodes = 0;
-	std::vector<pst::PersistentMapNode<TKey, TValue>*> path = BuildPath(toNode);
+	std::vector<const pst::PersistentMapNode<TKey, TValue>*> path = BuildPath(toNode);
 	for (auto* node : path)
 	{
 		if (node && !node->IsRed())
@@ -516,7 +569,7 @@ inline int pst::PersistentMap<TKey, TValue>::DEBUG_CountBlackNodes(pst::Persiste
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB(pst::PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes)
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfRB(const pst::PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes)const
 {
 	if (!node)
 	{
@@ -700,7 +753,7 @@ inline void pst::PersistentMap<TKey, TValue>::DeleteFixup(pst::PersistentMapNode
 
 template<typename TKey, typename TValue>
 inline std::tuple<std::shared_ptr<pst::PersistentMapNode<TKey, TValue>>, pst::PersistentMapNode<TKey, TValue>*> pst::PersistentMap<TKey, TValue>::ClonePath(
-	pst::PersistentMapNode<TKey, TValue>* from, const TKey& toKey)
+	const pst::PersistentMapNode<TKey, TValue>* from, const TKey& toKey) const
 {
 	assert(from->m_Key != toKey);
 	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> newFrom = from->Clone(m_CurrentVersion);
@@ -750,7 +803,7 @@ inline std::tuple<std::shared_ptr<pst::PersistentMapNode<TKey, TValue>>, pst::Pe
 }
 
 template<typename TKey, typename TValue>
-inline void pst::PersistentMap<TKey, TValue>::Transplant(pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent, 
+inline void pst::PersistentMap<TKey, TValue>::Transplant(const pst::PersistentMapNode<TKey, TValue>* target, pst::PersistentMapNode<TKey, TValue>* targetParent,
 	std::shared_ptr<pst::PersistentMapNode<TKey, TValue>> source)
 {
 	if (!targetParent)
@@ -770,7 +823,7 @@ inline void pst::PersistentMap<TKey, TValue>::Transplant(pst::PersistentMapNode<
 }
 
 template<typename TKey, typename TValue>
-inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted(pst::PersistentMapNode<TKey, TValue>* node)
+inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted(const pst::PersistentMapNode<TKey, TValue>* node) const
 {
 	if (!node)
 	{
@@ -791,7 +844,7 @@ inline bool pst::PersistentMap<TKey, TValue>::DEBUG_CheckIfSorted(pst::Persisten
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(pst::PersistentMapNode<TKey, TValue>* node, const TKey& key)
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(const pst::PersistentMapNode<TKey, TValue>* node, const TKey& key) const
 {
 	while (node && node->m_Key != key)
 	{
@@ -807,9 +860,14 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::S
 
 	return node;
 }
+template<typename TKey, typename TValue>
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::Search(pst::PersistentMapNode<TKey, TValue>* node, const TKey& key)
+{
+	return const_cast<pst::PersistentMapNode<TKey, TValue>*>(const_cast<const pst::PersistentMap<TKey, TValue>&>(*this).Search(node, key));
+}
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin(pst::PersistentMapNode<TKey, TValue>* node)
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin(const pst::PersistentMapNode<TKey, TValue>* node) const
 {
 	while (node->m_Left)
 	{
@@ -820,11 +878,40 @@ inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::G
 }
 
 template<typename TKey, typename TValue>
-inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax(pst::PersistentMapNode<TKey, TValue>* node)
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMin(pst::PersistentMapNode<TKey, TValue>* node)
+{
+	return const_cast<pst::PersistentMapNode<TKey, TValue>*>(const_cast<const pst::PersistentMap<TKey, TValue>&>(*this).GetMin(node));
+}
+
+template<typename TKey, typename TValue>
+inline const pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax(const pst::PersistentMapNode<TKey, TValue>* node) const
 {
 	while (node->m_Right)
 	{
 		node = node->m_Right.get();
+	}
+
+	return node;
+}
+
+template<typename TKey, typename TValue>
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMax(pst::PersistentMapNode<TKey, TValue>* node)
+{
+	return const_cast<pst::PersistentMapNode<TKey, TValue>*>(const_cast<const pst::PersistentMap<TKey, TValue>&>(*this).GetMax(node));
+}
+
+template<typename TKey, typename TValue>
+inline pst::PersistentMapNode<TKey, TValue>* pst::PersistentMap<TKey, TValue>::GetMinParent(pst::PersistentMapNode<TKey, TValue>* node)
+{
+	if (!node->m_Left)
+	{
+		// This is minimal node and we cannot aqcuire its parent
+		return nullptr;
+	}
+
+	while (node->m_Left->m_Left)
+	{
+		node = node->m_Left.get();
 	}
 
 	return node;

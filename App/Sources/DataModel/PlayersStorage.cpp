@@ -18,7 +18,7 @@ bool pst::PlayersStorage::Rollback(int step)
 	return true;
 }
 
-int pst::PlayersStorage::GetPlayerRating(const std::string& playerName)
+int pst::PlayersStorage::GetPlayerRating(const std::string& playerName) const
 {
 	auto* node = m_PlayerRatings.Search(playerName);
 	if (node)

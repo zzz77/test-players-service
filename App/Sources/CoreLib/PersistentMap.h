@@ -11,30 +11,11 @@ namespace pst
 	class PersistentMapNode
 	{
 	public:
-		PersistentMapNode(const TKey& key, int currentVersion)
-			: m_Key(key)
-			, m_CreateVersion(currentVersion)
-			, m_Red(false)
-			, m_Value(TValue())
-			, m_Left(nullptr)
-			, m_Right(nullptr)
-		{
-		}
+		PersistentMapNode(const TKey& key, int currentVersion);
 
-		PersistentMapNode(const PersistentMapNode<TKey, TValue>& other, int currentVersion)
-			: m_Key(other.m_Key)
-			, m_CreateVersion(currentVersion)
-			, m_Red(other.m_Red)
-			, m_Value(other.m_Value)
-			, m_Left(other.m_Left)
-			, m_Right(other.m_Right)
-		{
-		}
+		PersistentMapNode(const PersistentMapNode<TKey, TValue>& other, int currentVersion);
 
-		std::shared_ptr<PersistentMapNode> Clone(int currentVersion)
-		{
-			return std::make_shared<PersistentMapNode>(*this, currentVersion);
-		}
+		std::shared_ptr<PersistentMapNode> Clone(int currentVersion) const;
 
 		void SetIsRed([[maybe_unused]] int currentVersion, bool red)
 		{
@@ -43,7 +24,7 @@ namespace pst
 			m_Red = red;
 		}
 
-		bool IsRed() { return m_Red; }
+		bool IsRed() const { return m_Red; }
 
 		const TKey m_Key;
 		TValue m_Value;
@@ -64,27 +45,30 @@ namespace pst
 		void Rollback(int delta);
 		int GetVersion() const;
 
-		// TODO: Should return ref to value probably
+		// TODO: Return wrapper over key and value, not the node itself
 		/// Creates new node with specified key. If node already created - returns pointer to it. Creates new version of data.
 		PersistentMapNode<TKey, TValue>* Insert(const TKey& key);
 		void Delete(const TKey& key);
 
-		// TODO: Should return consts (and be const)!
-		PersistentMapNode<TKey, TValue>* Search(const TKey& key);
-		PersistentMapNode<TKey, TValue>* GetMin();
-		PersistentMapNode<TKey, TValue>* GetMax();
+		const PersistentMapNode<TKey, TValue>* Search(const TKey& key) const;
+		const PersistentMapNode<TKey, TValue>* GetMin() const;
+		const PersistentMapNode<TKey, TValue>* GetMax() const;
 
-		bool DEBUG_CheckIfSorted();
-		bool DEBUG_CheckIfRB();
+		bool DEBUG_CheckIfSorted() const;
+		bool DEBUG_CheckIfRB() const;
 
 	private:
+		const PersistentMapNode<TKey, TValue>* Search(const PersistentMapNode<TKey, TValue>* node, const TKey& key) const;
 		PersistentMapNode<TKey, TValue>* Search(PersistentMapNode<TKey, TValue>* node, const TKey& key);
+		const PersistentMapNode<TKey, TValue>* GetMin(const PersistentMapNode<TKey, TValue>* node) const;
 		PersistentMapNode<TKey, TValue>* GetMin(PersistentMapNode<TKey, TValue>* node);
+		const PersistentMapNode<TKey, TValue>* GetMax(const PersistentMapNode<TKey, TValue>* node) const;
 		PersistentMapNode<TKey, TValue>* GetMax(PersistentMapNode<TKey, TValue>* node);
 
-		// TODO: Think of better API for traversal!
+		/// Returns parent of minimal node right after specified node
 		PersistentMapNode<TKey, TValue>* GetMinParent(PersistentMapNode<TKey, TValue>* node);
 
+		const PersistentMapNode<TKey, TValue>* GetRoot() const;
 		PersistentMapNode<TKey, TValue>* GetRoot();
 		void ClearCurrentVersion();
 
@@ -93,15 +77,15 @@ namespace pst
 		/// Returns current version of toKey's parent node.
 		PersistentMapNode<TKey, TValue>* ClonePath(const TKey& toKey);
 
-		/// Clones previous version of [from; toKey)-nodes.
+		/// Clones [from; toKey)-nodes.
 		/// Node with m_Key == toKey is not cloned if it exists.
 		/// Returns current version of from and toKey's parent node.
-		std::tuple<std::shared_ptr<PersistentMapNode<TKey, TValue>>, PersistentMapNode<TKey, TValue>*> ClonePath(PersistentMapNode<TKey, TValue>* from, const TKey& toKey);
+		std::tuple<std::shared_ptr<PersistentMapNode<TKey, TValue>>, PersistentMapNode<TKey, TValue>*> ClonePath(const PersistentMapNode<TKey, TValue>* from, const TKey& toKey) const;
 
 		/// Detaches target from targetParent and makes source child of targetParent. 
 		/// TargetParent should be of current version.
 		/// Source can be either of old version or of current version. It is responsibility of caller to clone it if necessary
-		void Transplant(PersistentMapNode<TKey, TValue>* target, PersistentMapNode<TKey, TValue>* targetParent, std::shared_ptr<PersistentMapNode<TKey, TValue>> source);
+		void Transplant(const PersistentMapNode<TKey, TValue>* target, PersistentMapNode<TKey, TValue>* targetParent, std::shared_ptr<PersistentMapNode<TKey, TValue>> source);
 
 		/// Rotates subtree to left
 		/// Target and one of it's child will NOT be cloned. It is responsibility of caller to clone it if necessary
@@ -124,11 +108,12 @@ namespace pst
 
 		/// Returns path [root; toNode) as a vector where root is located at 0 element and toNode's parent at last element. Uses current version
 		std::vector<PersistentMapNode<TKey, TValue>*> BuildPath(PersistentMapNode<TKey, TValue>* toNode);
+		std::vector<const PersistentMapNode<TKey, TValue>*> BuildPath(const PersistentMapNode<TKey, TValue>* toNode) const;
 
 		// TODO: Move to separate class with tests
-		bool DEBUG_CheckIfSorted(PersistentMapNode<TKey, TValue>* node);
-		bool DEBUG_CheckIfRB(PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes);
-		int DEBUG_CountBlackNodes(PersistentMapNode<TKey, TValue>* toNode);
+		bool DEBUG_CheckIfSorted(const PersistentMapNode<TKey, TValue>* node) const;
+		bool DEBUG_CheckIfRB(const PersistentMapNode<TKey, TValue>* node, int expectedBlackNodes) const;
+		int DEBUG_CountBlackNodes(const PersistentMapNode<TKey, TValue>* toNode) const;
 
 		std::vector<std::shared_ptr<PersistentMapNode<TKey, TValue>>> m_RootHistory;
 		int m_CurrentVersion;
